@@ -1,0 +1,16 @@
+﻿.venv/
+.venv312/
+__pycache__/
+*.pyc
+.env
+*.zip
+.pytest_cache/
+.vscode/
+.idea/
+data/raw/
+data/*.zip
+data/processed/detection_dos_cleaned.csv
+data/processed/train_dos.csv
+data/processed/test_dos.csv
+data/processed/validation_dos.csv
+data/processed/valid_dos.csv

@@ -1,0 +1,27 @@
+{
+  "model_name": "CODEZILLA-UWF-2025-HGB",
+  "dataset": "UWF-ZeekDataSum2025-1",
+  "feature_count": 14,
+  "numeric_features": [
+    "duration",
+    "missed_bytes",
+    "orig_bytes",
+    "orig_ip_bytes",
+    "orig_pkts",
+    "resp_bytes",
+    "resp_ip_bytes",
+    "resp_pkts"
+  ],
+  "categorical_features": [
+    "conn_state",
+    "history",
+    "service",
+    "proto",
+    "local_orig",
+    "local_resp"
+  ],
+  "decision_threshold": 0.5,
+  "task": "binary benign vs threat on modern UWF Zeek data",
+  "evaluation_method": "grouped_out_of_group_cross_validation",
+  "note": "Auxiliary modern benchmark; does not replace DDoS/C2/DNS/encrypted production detectors."
+}

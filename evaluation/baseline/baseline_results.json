@@ -1,0 +1,12 @@
+{
+    "model": "Logistic Regression",
+    "dataset": "CIC-IDS-2018 Wednesday 21-02-2018",
+    "task": "Binary DDoS detection",
+    "features": 68,
+    "test_accuracy": 1.0,
+    "test_precision": 1.0,
+    "test_recall": 1.0,
+    "test_f1": 1.0,
+    "test_false_positive_rate": 0.0,
+    "test_inference_seconds": 0.018831600027624518
+}

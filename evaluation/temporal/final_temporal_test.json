@@ -1,0 +1,22 @@
+{
+    "model": "HistGradientBoosting",
+    "window_size_seconds": 2,
+    "prediction_horizon_seconds": 2,
+    "feature_count": 62,
+    "threshold": 0.8,
+    "test_accuracy": 0.9075342465753424,
+    "test_precision": 0.9625,
+    "test_recall": 0.88,
+    "test_f1": 0.9194029850746268,
+    "test_fpr": 0.05128205128205128,
+    "confusion_matrix": [
+        [
+            111,
+            6
+        ],
+        [
+            21,
+            154
+        ]
+    ]
+}

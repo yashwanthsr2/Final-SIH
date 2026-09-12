@@ -1,0 +1,2 @@
+# CODEZILLA live-capture add-on
+scapy>=2.7,<2.8

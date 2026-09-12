@@ -1,0 +1,5365 @@
+﻿
+
+==================== E:\CODEZILLA-SIH26145\app\main.py ====================
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+import json
+import sys
+import threading
+import time
+
+import pandas as pd
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+
+# ============================================================
+# PROJECT ROOT
+# ============================================================
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+
+# ============================================================
+# CODEZILLA IMPORTS
+# ============================================================
+
+from app.schemas import (
+    DetectionRequest,
+    UnifiedAlert,
+)
+
+from app.services.detection_service import (
+    analyze_request,
+)
+
+from src.live_monitor import LiveMonitor
+
+
+# ============================================================
+# FASTAPI APPLICATION
+# ============================================================
+
+app = FastAPI(
+    title="CODEZILLA Threat Detection API",
+    description=(
+        "Passive multi-detector cybersecurity "
+        "analysis and evidence-fusion platform."
+    ),
+    version="1.0.0",
+)
+
+
+# ============================================================
+# CORS
+# ============================================================
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ============================================================
+# ALERT STORE
+# ============================================================
+
+ALERTS: List[Dict[str, Any]] = []
+
+MAX_ALERTS = 100
+
+
+def store_alert(
+    result: Dict[str, Any]
+) -> None:
+    """
+    Store only actual threat results.
+    """
+
+    if result.get("prediction") != "THREAT":
+        return
+
+    ALERTS.insert(
+        0,
+        result,
+    )
+
+    if len(ALERTS) > MAX_ALERTS:
+        del ALERTS[MAX_ALERTS:]
+
+
+# ============================================================
+# STATIC DASHBOARD
+# ============================================================
+
+STATIC_DIR = (
+    PROJECT_ROOT
+    / "app"
+    / "static"
+)
+
+STATIC_DIR.mkdir(
+    parents=True,
+    exist_ok=True,
+)
+
+
+# ============================================================
+# VERIFIED C2 DEMO LOADER
+# ============================================================
+
+def load_verified_c2_demo() -> Dict[str, Any]:
+    """Load the real unseen C2 sample saved from the V3 test set."""
+
+    c2_path = PROJECT_ROOT / "evaluation" / "packaging" / "c2_verified_attack_input.csv"
+    schema_path = PROJECT_ROOT / "models" / "c2_feature_schema.json"
+
+    if not c2_path.exists():
+        raise FileNotFoundError(f"C2 verified sample not found: {c2_path}")
+
+    if not schema_path.exists():
+        raise FileNotFoundError(f"C2 feature schema not found: {schema_path}")
+
+    c2_data = pd.read_csv(c2_path)
+
+    if c2_data.empty:
+        raise ValueError("C2 verified sample is empty.")
+
+    with open(schema_path, "r", encoding="utf-8") as f:
+        schema = json.load(f)
+
+    required_features = schema.get("features", [])
+
+    if len(required_features) != 62:
+        raise ValueError(f"Expected 62 C2 features, found {len(required_features)}.")
+
+    missing = [feature for feature in required_features if feature not in c2_data.columns]
+
+    if missing:
+        raise ValueError(
+            "C2 verified sample is missing required features: "
+            + ", ".join(missing[:10])
+            + ("..." if len(missing) > 10 else "")
+        )
+
+    row = c2_data.iloc[0]
+
+    return {feature: float(row[feature]) for feature in required_features}
+
+
+VERIFIED_C2_TIME_WINDOW = "2011-08-10T15:13:40"
+
+
+# ============================================================
+# VERIFIED DEMO SCENARIOS
+# ============================================================
+
+VERIFIED_SCENARIOS: Dict[str, Dict[str, Any]] = {
+
+    # --------------------------------------------------------
+    # DNS
+    # --------------------------------------------------------
+
+    "dns": {
+        "source": "147.32.84.165",
+
+        "time_window":
+            "2011-08-10T13:33:00",
+
+        "dns_features": {
+
+            "dns_query_rate":
+                56.8,
+
+            "dns_unique_destinations":
+                22,
+
+            "dns_packet_concentration":
+                0.952465,
+
+            "dns_byte_concentration":
+                0.959053,
+
+            "dns_iat_cv":
+                5.503624,
+
+            "query_rate_prev":
+                52.0,
+
+            "query_rate_roll3":
+                50.0,
+
+            "query_rate_roll6":
+                48.0,
+
+            "query_rate_std6":
+                5.0,
+
+            "query_rate_change":
+                4.8,
+
+            "query_rate_z6":
+                1.2,
+
+            "destination_change":
+                2.0,
+
+            "bytes_per_query":
+                250.0,
+
+            "packets_per_query":
+                2.0,
+        },
+    },
+
+
+    # --------------------------------------------------------
+    # C2
+    # --------------------------------------------------------
+
+    "c2": {
+        "source":
+            "147.32.84.165",
+
+        "time_window":
+            VERIFIED_C2_TIME_WINDOW,
+
+        "c2_features":
+            load_verified_c2_demo(),
+    },
+
+
+    # --------------------------------------------------------
+    # ENCRYPTED TRAFFIC
+    # --------------------------------------------------------
+
+    "encrypted": {
+        "source":
+            "147.32.84.165",
+
+        "time_window":
+            "2011-08-10T11:07:00",
+
+        "encrypted_features": {
+
+            "encrypted_flow_count":
+                1,
+
+            "encrypted_total_packets":
+                7,
+
+            "encrypted_total_bytes":
+                558,
+
+            "encrypted_unique_destinations":
+                1,
+
+            "encrypted_unique_ports":
+                1,
+
+            "encrypted_mean_duration":
+                9.56554,
+
+            "bytes_per_flow":
+                558,
+
+            "packets_per_flow":
+                7,
+
+            "flow_count_change":
+                0,
+
+            "bytes_change":
+                192,
+
+            "destination_change":
+                0,
+        },
+    },
+}
+
+
+# ============================================================
+# CORRELATED 3-DETECTOR SCENARIO
+# ============================================================
+
+VERIFIED_SCENARIOS["correlated"] = {
+
+    "source":
+        "147.32.84.165",
+
+    "time_window":
+        VERIFIED_C2_TIME_WINDOW,
+
+    # --------------------------------------------------------
+    # C2
+    # Uses the verified unseen C2 ML sample.
+    # --------------------------------------------------------
+
+    "c2_features":
+        load_verified_c2_demo(),
+
+
+    # --------------------------------------------------------
+    # DNS
+    # --------------------------------------------------------
+
+    "dns_features": {
+
+        "dns_query_rate":
+            56.8,
+
+        "dns_unique_destinations":
+            22,
+
+        "dns_packet_concentration":
+            0.952465,
+
+        "dns_byte_concentration":
+            0.959053,
+
+        "dns_iat_cv":
+            5.503624,
+
+        "query_rate_prev":
+            52.0,
+
+        "query_rate_roll3":
+            50.0,
+
+        "query_rate_roll6":
+            48.0,
+
+        "query_rate_std6":
+            5.0,
+
+        "query_rate_change":
+            4.8,
+
+        "query_rate_z6":
+            1.2,
+
+        "destination_change":
+            2.0,
+
+        "bytes_per_query":
+            250.0,
+
+        "packets_per_query":
+            2.0,
+    },
+
+    # --------------------------------------------------------
+    # ENCRYPTED
+    # --------------------------------------------------------
+
+    "encrypted_features": {
+
+        "encrypted_flow_count":
+            1,
+
+        "encrypted_total_packets":
+            7,
+
+        "encrypted_total_bytes":
+            558,
+
+        "encrypted_unique_destinations":
+            1,
+
+        "encrypted_unique_ports":
+            1,
+
+        "encrypted_mean_duration":
+            9.56554,
+
+        "bytes_per_flow":
+            558,
+
+        "packets_per_flow":
+            7,
+
+        "flow_count_change":
+            0,
+
+        "bytes_change":
+            192,
+
+        "destination_change":
+            0,
+    },
+}
+
+
+# ============================================================
+# LIVE MONITORING
+# ============================================================
+
+def _run_live_alert(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Run the existing unified detector pipeline for live features."""
+    request = DetectionRequest(**payload)
+    result = analyze_request(request)
+    store_alert(result)
+    return result
+
+
+LIVE_MONITOR = LiveMonitor(
+    detect_callback=_run_live_alert,
+    default_window_seconds=5,
+)
+
+
+LIVE_REPLAY_LOCK = threading.Lock()
+LIVE_REPLAY_RUNNING = False
+
+
+@app.get("/live/interfaces")
+def live_interfaces():
+    """Return discoverable packet-capture interfaces."""
+    interfaces = LIVE_MONITOR.list_interfaces()
+    return {
+        "interfaces": interfaces,
+        "capture_backend": "Scapy + Npcap",
+        "passive_only": True,
+    }
+
+
+@app.post("/live/start")
+def live_start(interface: Optional[str] = None):
+    """Start passive live packet capture."""
+    return LIVE_MONITOR.start(interface=interface or None)
+
+
+@app.post("/live/stop")
+def live_stop():
+    """Stop passive live packet capture."""
+    return LIVE_MONITOR.stop()
+
+
+@app.get("/live/status")
+def live_status():
+    """Return current live capture telemetry."""
+    return LIVE_MONITOR.snapshot()
+
+
+@app.post("/demo/replay-live")
+def replay_verified_attacks_live():
+    """Run verified detector scenarios sequentially for a presentation-safe replay."""
+    global LIVE_REPLAY_RUNNING
+
+    with LIVE_REPLAY_LOCK:
+        if LIVE_REPLAY_RUNNING:
+            return {"status": "already_running"}
+        LIVE_REPLAY_RUNNING = True
+
+    def worker() -> None:
+        global LIVE_REPLAY_RUNNING
+        try:
+            # Presentation-safe, deterministic replay. No packets are generated
+            # or transmitted; only verified feature scenarios are fed through the
+            # same production detection and fusion pipeline.
+            for scenario in ("dns", "c2", "encrypted", "correlated"):
+                payload = VERIFIED_SCENARIOS[scenario]
+                result = analyze_request(DetectionRequest(**payload))
+                store_alert(result)
+                time.sleep(0.9)
+
+            result = run_ddos_demo()
+            # run_ddos_demo already stores the DDoS alert.
+            _ = result
+        finally:
+            LIVE_REPLAY_RUNNING = False
+
+    threading.Thread(
+        target=worker,
+        name="codezilla-verified-replay",
+        daemon=True,
+    ).start()
+
+    return {"status": "started", "mode": "verified_attack_replay"}
+
+
+# ============================================================
+# HEALTH
+# ============================================================
+
+@app.get(
+    "/health"
+)
+def health():
+
+    return {
+        "status":
+            "ok",
+
+        "service":
+            "CODEZILLA",
+
+        "version":
+            "1.0.0",
+
+        "detectors": [
+            "DDoS",
+            "C2",
+            "DNS",
+            "ENCRYPTED_TRAFFIC",
+        ],
+    }
+
+
+# ============================================================
+# MAIN DETECTION ENDPOINT
+# ============================================================
+
+@app.post(
+    "/detect",
+    response_model=UnifiedAlert,
+)
+def detect(
+    request: DetectionRequest,
+):
+
+    try:
+
+        result = analyze_request(
+            request
+        )
+
+    except Exception as exc:
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(exc),
+        ) from exc
+
+    store_alert(
+        result
+    )
+
+    return result
+
+
+# ============================================================
+# ALERT HISTORY
+# ============================================================
+
+@app.get(
+    "/alerts"
+)
+def get_alerts():
+
+    return {
+        "count":
+            len(ALERTS),
+
+        "alerts":
+            ALERTS,
+    }
+
+
+# ============================================================
+# CLEAR ALERTS
+# ============================================================
+
+@app.delete(
+    "/alerts"
+)
+def clear_alerts():
+
+    ALERTS.clear()
+
+    return {
+        "status":
+            "cleared"
+    }
+
+
+# ============================================================
+# LIST DEMO SCENARIOS
+# ============================================================
+
+@app.get(
+    "/demo"
+)
+def list_demo_scenarios():
+
+    return {
+        "scenarios": [
+            "dns",
+            "c2",
+            "encrypted",
+            "correlated",
+            "ddos",
+        ]
+    }
+
+
+# ============================================================
+# ============================================================
+# DDOS VERIFIED DEMO
+#
+# Final judge-safe implementation:
+# - Uses the packaged, verified 62-feature CSV input.
+# - Does NOT require pandas parquet/pyarrow for the dashboard demo.
+# - Sends the sample through the same production DDoS ML pipeline.
+# - Preserves all other routes, including live monitoring.
+# ============================================================
+
+@app.post(
+    "/demo/ddos"
+)
+def run_ddos_demo():
+
+    csv_path = (
+        PROJECT_ROOT
+        / "evaluation"
+        / "packaging"
+        / "verified_attack_input.csv"
+    )
+
+    schema_path = (
+        PROJECT_ROOT
+        / "models"
+        / "dos_feature_schema.json"
+    )
+
+    if not csv_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Verified DDoS demo input not found: "
+                + str(csv_path)
+            ),
+        )
+
+    if not schema_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "DDoS feature schema not found: "
+                + str(schema_path)
+            ),
+        )
+
+    try:
+        ddos_data = pd.read_csv(csv_path)
+
+        with open(
+            schema_path,
+            "r",
+            encoding="utf-8",
+        ) as f:
+            dos_schema = json.load(f)
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Failed to load verified DDoS demo input: "
+                + str(exc)
+            ),
+        ) from exc
+
+    if ddos_data.empty:
+        raise HTTPException(
+            status_code=500,
+            detail="Verified DDoS demo input is empty.",
+        )
+
+    required_features = dos_schema.get("features", [])
+
+    if len(required_features) != 62:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Expected exactly 62 DDoS features, found "
+                f"{len(required_features)}."
+            ),
+        )
+
+    missing_features = [
+        feature
+        for feature in required_features
+        if feature not in ddos_data.columns
+    ]
+
+    if missing_features:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "DDoS feature mismatch",
+                "missing_features": missing_features,
+            },
+        )
+
+    selected = ddos_data.iloc[0]
+    ddos_payload: Dict[str, float] = {}
+
+    for feature in required_features:
+        value = selected[feature]
+
+        try:
+            ddos_payload[feature] = float(value)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    f"Invalid DDoS value for '{feature}': {value}"
+                ),
+            )
+
+    try:
+        request = DetectionRequest(
+            source="VERIFIED-DDOS-SAMPLE",
+            time_window="VERIFIED-BENCHMARK-WINDOW",
+            ddos_features=ddos_payload,
+        )
+
+        result = analyze_request(request)
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "DDoS detection failed: "
+                + str(exc)
+            ),
+        ) from exc
+
+    store_alert(result)
+
+    result["demo_source"] = "verified_ddos_csv"
+    result["demo_input"] = str(csv_path.relative_to(PROJECT_ROOT))
+
+    if "score" in result:
+        try:
+            result["verified_model_score"] = float(result["score"])
+        except (TypeError, ValueError):
+            pass
+
+    return result
+
+
+# ============================================================
+# RUN ALL DEMO SCENARIOS
+#
+# IMPORTANT:
+# This route MUST appear before /demo/{scenario}.
+# ============================================================
+
+#
+# IMPORTANT:
+# This route MUST appear before /demo/{scenario}.
+# ============================================================
+
+@app.post(
+    "/demo/run-all"
+)
+def run_all_demo_scenarios():
+
+    results: Dict[
+        str,
+        Any
+    ] = {}
+
+
+    # --------------------------------------------------------
+    # DNS / C2 / ENCRYPTED / CORRELATED
+    # --------------------------------------------------------
+
+    for (
+        scenario,
+        payload,
+    ) in VERIFIED_SCENARIOS.items():
+
+        try:
+
+            request = DetectionRequest(
+                **payload
+            )
+
+            result = analyze_request(
+                request
+            )
+
+            results[
+                scenario
+            ] = result
+
+            store_alert(
+                result
+            )
+
+        except Exception as exc:
+
+            results[
+                scenario
+            ] = {
+                "prediction":
+                    "ERROR",
+
+                "error":
+                    str(exc),
+            }
+
+
+    # --------------------------------------------------------
+    # DDoS
+    # --------------------------------------------------------
+
+    try:
+
+        ddos_result = (
+            run_ddos_demo()
+        )
+
+        results[
+            "ddos"
+        ] = ddos_result
+
+    except Exception as exc:
+
+        results[
+            "ddos"
+        ] = {
+            "prediction":
+                "ERROR",
+
+            "error":
+                str(exc),
+        }
+
+
+    return {
+
+        "scenarios_run":
+            len(results),
+
+        "results":
+            results,
+
+        "alert_count":
+            len(ALERTS),
+    }
+
+
+# ============================================================
+# GENERIC DEMO SCENARIO
+#
+# IMPORTANT:
+# This MUST be AFTER the specific demo routes above.
+# ============================================================
+
+@app.post(
+    "/demo/{scenario}"
+)
+def run_demo_scenario(
+    scenario: str,
+):
+
+    if (
+        scenario
+        not in VERIFIED_SCENARIOS
+    ):
+
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error":
+                    "Unknown demo scenario",
+
+                "available":
+                    [
+                        "dns",
+                        "c2",
+                        "encrypted",
+                        "correlated",
+                        "ddos",
+                    ],
+            },
+        )
+
+
+    payload = (
+        VERIFIED_SCENARIOS[
+            scenario
+        ]
+    )
+
+
+    try:
+
+        request = DetectionRequest(
+            **payload
+        )
+
+        result = analyze_request(
+            request
+        )
+
+    except Exception as exc:
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Demo scenario "
+                f"'{scenario}' failed: "
+                f"{exc}"
+            ),
+        ) from exc
+
+
+    store_alert(
+        result
+    )
+
+    return result
+
+
+# ============================================================
+# STATIC FILES
+# ============================================================
+
+app.mount(
+    "/static",
+    StaticFiles(
+        directory=str(
+            STATIC_DIR
+        )
+    ),
+    name="static",
+)
+
+
+# ============================================================
+# DASHBOARD
+# ============================================================
+
+@app.get(
+    "/",
+    include_in_schema=False,
+)
+def dashboard():
+
+    index_file = (
+        STATIC_DIR
+        / "index.html"
+    )
+
+    if not index_file.exists():
+
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Dashboard file not found: "
+                + str(index_file)
+            ),
+        )
+
+    return FileResponse(
+        index_file
+    )
+
+
+==================== E:\CODEZILLA-SIH26145\app\requirements-live.txt ====================
+
+# CODEZILLA live-capture add-on
+scapy>=2.7,<2.8
+
+
+==================== E:\CODEZILLA-SIH26145\app\schemas.py ====================
+
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field
+
+
+class DetectionRequest(BaseModel):
+    """
+    Generic CODEZILLA detection request.
+
+    The client may send feature dictionaries for any
+    supported detector.
+    """
+
+    source: Optional[str] = None
+
+    time_window: Optional[str] = None
+
+    ddos_features: Optional[Dict[str, float]] = None
+
+    c2_features: Optional[Dict[str, float]] = None
+
+    dns_features: Optional[Dict[str, float]] = None
+
+    encrypted_features: Optional[Dict[str, float]] = None
+
+
+class DetectorResult(BaseModel):
+
+    detector: str
+
+    prediction: str
+
+    score: float = Field(
+        ge=0.0,
+        le=1.0
+    )
+
+    threat_class: str
+
+    severity: str
+
+    supporting_features: List[
+        Dict[str, Any]
+    ] = []
+
+
+class UnifiedAlert(BaseModel):
+
+    prediction: str
+
+    severity: str
+
+    score: float
+
+    primary_threat: Optional[str] = None
+
+    source: Optional[str] = None
+
+    time_window: Optional[str] = None
+
+    detector_count: int
+
+    threats: List[
+        DetectorResult
+    ]
+
+    evidence: List[
+        Dict[str, Any]
+    ]
+
+
+==================== E:\CODEZILLA-SIH26145\app\__init__.py ====================
+
+
+
+==================== E:\CODEZILLA-SIH26145\app\services\detection_service.py ====================
+
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
+
+from src.detectors.dos_detector import detect as detect_ddos
+from src.detectors.c2_detector import detect as detect_c2
+from src.detectors.dns_detector import detect as detect_dns
+from src.detectors.encrypted_detector import detect as detect_encrypted
+
+
+# ============================================================
+# CODEZILLA DETECTOR SERVICE
+# ============================================================
+
+
+def _single_row(features: Dict[str, Any]) -> pd.DataFrame:
+    """
+    Convert one feature dictionary into a one-row DataFrame.
+    """
+
+    if not isinstance(features, dict):
+        raise TypeError(
+            "Detector features must be provided as a dictionary."
+        )
+
+    return pd.DataFrame([features])
+
+
+def _extract_score(result: Dict[str, Any]) -> float:
+    """
+    Normalize score field.
+
+    Existing detectors may use either:
+        model_score
+    or:
+        score
+    """
+
+    raw_score = result.get(
+        "model_score",
+        result.get("score", 0.0),
+    )
+
+    try:
+        score = float(raw_score)
+    except (TypeError, ValueError):
+        score = 0.0
+
+    # Keep score inside the valid probability range.
+    return max(0.0, min(1.0, score))
+
+
+def _extract_supporting_features(
+    result: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """
+    Normalize supporting evidence from detector outputs.
+    """
+
+    evidence = result.get(
+        "supporting_features",
+        result.get("evidence", []),
+    )
+
+    if evidence is None:
+        return []
+
+    if not isinstance(evidence, list):
+        return []
+
+    return evidence
+
+
+def _normalize_detector_result(
+    result: Dict[str, Any],
+    detector_name: str,
+) -> Dict[str, Any]:
+    """
+    Convert any detector output into CODEZILLA's
+    common detector-result format.
+    """
+
+    score = _extract_score(result)
+
+    prediction = str(
+        result.get(
+            "prediction",
+            "BENIGN",
+        )
+    )
+
+    threat_class = str(
+        result.get(
+            "threat_class",
+            detector_name,
+        )
+    )
+
+    severity = str(
+        result.get(
+            "severity",
+            "LOW",
+        )
+    ).upper()
+
+    supporting_features = (
+        _extract_supporting_features(result)
+    )
+
+    normalized = {
+        "detector": detector_name,
+        "prediction": prediction,
+        "score": score,
+        "model_score": score,
+        "threat_class": threat_class,
+        "severity": severity,
+        "supporting_features": supporting_features,
+    }
+
+    return normalized
+
+
+def run_detector(
+    detector_name: str,
+    features: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Run one CODEZILLA detector.
+
+    Supported detectors:
+        DDoS
+        C2
+        DNS
+        ENCRYPTED_TRAFFIC
+    """
+
+    dataframe = _single_row(features)
+
+    # --------------------------------------------------------
+    # Run selected detector
+    # --------------------------------------------------------
+
+    if detector_name == "DDoS":
+
+        results = detect_ddos(
+            dataframe,
+            top_k=5,
+        )
+
+    elif detector_name == "C2":
+
+        results = detect_c2(
+            dataframe,
+            top_k=5,
+        )
+
+    elif detector_name == "DNS":
+
+        results = detect_dns(
+            dataframe,
+            top_k=5,
+        )
+
+    elif detector_name == "ENCRYPTED_TRAFFIC":
+
+        results = detect_encrypted(
+            dataframe,
+            top_k=5,
+        )
+
+    else:
+
+        raise ValueError(
+            f"Unsupported detector: {detector_name}"
+        )
+
+    # --------------------------------------------------------
+    # Empty result
+    # --------------------------------------------------------
+
+    if not results:
+
+        return {
+            "detector": detector_name,
+            "prediction": "BENIGN",
+            "score": 0.0,
+            "model_score": 0.0,
+            "threat_class": detector_name,
+            "severity": "LOW",
+            "supporting_features": [],
+        }
+
+    # --------------------------------------------------------
+    # Normalize first result
+    # --------------------------------------------------------
+
+    first_result = results[0]
+
+    if not isinstance(first_result, dict):
+
+        raise TypeError(
+            f"{detector_name} detector returned "
+            f"an unexpected result type: "
+            f"{type(first_result)}"
+        )
+
+    return _normalize_detector_result(
+        first_result,
+        detector_name,
+    )
+
+
+def _severity_rank(severity: str) -> int:
+    """
+    Convert severity to sortable numeric rank.
+    """
+
+    ranking = {
+        "LOW": 1,
+        "MEDIUM": 2,
+        "HIGH": 3,
+        "CRITICAL": 4,
+    }
+
+    return ranking.get(
+        str(severity).upper(),
+        0,
+    )
+
+
+def analyze_request(
+    request: Any,
+) -> Dict[str, Any]:
+    """
+    Run all detectors supplied in the request and
+    create one unified CODEZILLA alert.
+    """
+
+    detector_results: List[
+        Dict[str, Any]
+    ] = []
+
+    # --------------------------------------------------------
+    # Detector input mapping
+    # --------------------------------------------------------
+
+    detector_inputs = {
+        "DDoS": getattr(
+            request,
+            "ddos_features",
+            None,
+        ),
+
+        "C2": getattr(
+            request,
+            "c2_features",
+            None,
+        ),
+
+        "DNS": getattr(
+            request,
+            "dns_features",
+            None,
+        ),
+
+        "ENCRYPTED_TRAFFIC": getattr(
+            request,
+            "encrypted_features",
+            None,
+        ),
+    }
+
+    # --------------------------------------------------------
+    # Run supplied detectors
+    # --------------------------------------------------------
+
+    for detector_name, features in detector_inputs.items():
+
+        if features is None:
+            continue
+
+        try:
+
+            result = run_detector(
+                detector_name,
+                features,
+            )
+
+            detector_results.append(
+                result
+            )
+
+        except Exception as exc:
+
+            # Keep the API alive if one optional detector fails.
+            # The error is represented in the response rather
+            # than crashing the complete request.
+
+            detector_results.append({
+                "detector": detector_name,
+                "prediction": "ERROR",
+                "score": 0.0,
+                "model_score": 0.0,
+                "threat_class": detector_name,
+                "severity": "LOW",
+                "supporting_features": [
+                    {
+                        "feature": "detector_error",
+                        "feature_value": str(exc),
+                    }
+                ],
+            })
+
+    # --------------------------------------------------------
+    # Active threats only
+    # --------------------------------------------------------
+
+    active_threats = [
+        result
+        for result in detector_results
+        if result["prediction"] not in {
+            "BENIGN",
+            "ERROR",
+        }
+    ]
+
+    # --------------------------------------------------------
+    # No threat
+    # --------------------------------------------------------
+
+    if not active_threats:
+
+        return {
+            "prediction": "BENIGN",
+            "severity": "LOW",
+            "score": 0.0,
+            "primary_threat": None,
+            "source": getattr(
+                request,
+                "source",
+                None,
+            ),
+            "time_window": getattr(
+                request,
+                "time_window",
+                None,
+            ),
+            "detector_count": 0,
+            "threats": [],
+            "evidence": [],
+        }
+
+    # --------------------------------------------------------
+    # Strongest detector
+    # --------------------------------------------------------
+
+    strongest = max(
+        active_threats,
+        key=lambda result: float(
+            result.get("score", 0.0)
+        ),
+    )
+
+    # --------------------------------------------------------
+    # Overall severity
+    # --------------------------------------------------------
+
+    overall_severity = max(
+        (
+            result.get(
+                "severity",
+                "LOW",
+            )
+            for result in active_threats
+        ),
+        key=_severity_rank,
+    )
+
+    # --------------------------------------------------------
+    # Combined evidence
+    # --------------------------------------------------------
+
+    evidence: List[
+        Dict[str, Any]
+    ] = []
+
+    for result in active_threats:
+
+        supporting_features = result.get(
+            "supporting_features",
+            [],
+        )
+
+        if isinstance(
+            supporting_features,
+            list,
+        ):
+
+            for item in supporting_features:
+
+                if isinstance(
+                    item,
+                    dict,
+                ):
+
+                    evidence.append(
+                        item
+                    )
+
+    # --------------------------------------------------------
+    # Final unified alert
+    # --------------------------------------------------------
+
+    final_alert = {
+        "prediction": "THREAT",
+
+        "severity": overall_severity,
+
+        "score": round(
+            float(
+                strongest.get(
+                    "score",
+                    0.0,
+                )
+            ),
+            4,
+        ),
+
+        "primary_threat": strongest.get(
+            "threat_class"
+        ),
+
+        "source": getattr(
+            request,
+            "source",
+            None,
+        ),
+
+        "time_window": getattr(
+            request,
+            "time_window",
+            None,
+        ),
+
+        "detector_count": len(
+            active_threats
+        ),
+
+        "threats": active_threats,
+
+        "evidence": evidence,
+    }
+
+    return final_alert
+
+
+==================== E:\CODEZILLA-SIH26145\app\services\__init__.py ====================
+
+
+
+==================== E:\CODEZILLA-SIH26145\app\static\index.html ====================
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CODEZILLA SOC</title>
+<style>
+:root{--bg:#050912;--panel:#0b1422;--panel2:#0e1a2a;--line:#1d3046;--text:#edf5ff;--muted:#8191a8;--cyan:#40dcff;--green:#43e8a0;--red:#ff5d74;--amber:#ffb14b;--purple:#b37aff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#0a1524 0,#050912 36%,#03060b 100%);color:var(--text);font-family:Segoe UI,Arial,sans-serif}
+button,select{font:inherit}.header{height:70px;padding:0 30px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);background:rgba(6,12,22,.92);position:sticky;top:0;z-index:10;backdrop-filter:blur(8px)}
+.logo{font-size:26px;font-weight:900;letter-spacing:1px}.logo span{color:var(--cyan)}.status{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:12px}.dot{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 13px var(--green)}
+.container{max-width:1600px;margin:auto;padding:28px}.hero{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;margin-bottom:20px}.hero h1{margin:0 0 7px;font-size:35px}.hero p{margin:0;color:var(--muted)}
+.mode-strip{display:flex;gap:12px;flex-wrap:wrap}.mode-badge{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:#0a1320;color:#b7c7da;font-size:11px}.mode-badge.active{border-color:#216f80;color:#8feaff;background:#091923}
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:13px;margin-bottom:18px}.stat{background:linear-gradient(180deg,#0c1726,#09111d);border:1px solid var(--line);border-radius:13px;padding:15px}.label{font-size:10px;color:#7e90a9;font-weight:700;letter-spacing:.7px}.value{margin-top:7px;font-size:24px;font-weight:900}.live-value{color:var(--cyan)}
+.main{display:grid;grid-template-columns:370px 1fr;gap:18px}.panel{background:rgba(10,19,32,.92);border:1px solid var(--line);border-radius:15px;padding:19px;box-shadow:0 14px 40px rgba(0,0,0,.15)}.title{margin:0;font-size:18px}.sub{margin:6px 0 15px;color:var(--muted);font-size:11px}
+.controls{display:grid;gap:10px}.control-row{display:flex;gap:8px}.select{width:100%;background:#091321;border:1px solid #243951;color:#e8f0fa;border-radius:9px;padding:10px}.btn{border:1px solid #28405a;background:#101d2d;color:#dceaf8;border-radius:9px;padding:10px 12px;cursor:pointer;font-weight:700;font-size:11px;transition:.15s}.btn:hover{border-color:var(--cyan);transform:translateY(-1px)}.btn.primary{background:#0b2530;border-color:#1a7788;color:#8deaff}.btn.stop{background:#2c1219;border-color:#713444;color:#ff8c9a}.btn.replay{background:#1b1227;border-color:#5d3480;color:#d7b8ff}.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.monitor-card{margin-top:12px;padding:14px;border-radius:11px;background:#08111c;border:1px solid #1b2d42}.monitor-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.capture-state{font-size:10px;font-weight:800;color:#7f90a6}.capture-state.live{color:var(--green)}.meter{height:7px;background:#101d2c;border-radius:20px;overflow:hidden}.meter>div{height:100%;width:0;background:linear-gradient(90deg,var(--cyan),#6df2c3)}.mini{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.mini div{padding:9px;border:1px solid #1a2a3c;border-radius:8px;background:#091321}.mini b{display:block;font-size:13px}.mini span{font-size:9px;color:var(--muted)}
+.scenarios{margin-top:18px;display:grid;gap:8px}.scenario{width:100%;text-align:left;padding:11px 12px;background:#0f1b2a;border:1px solid #23374e;color:#e8f1fb;border-radius:9px;cursor:pointer}.scenario:hover{border-color:#4f7d9a}.scenario strong{display:block;font-size:11px}.scenario small{display:block;color:#73859b;margin-top:4px;font-size:9px}.ddos{border-color:#61492a;background:#18150e}.corr{border-color:#633648;background:#18101a}.message{margin-top:11px;min-height:17px;font-size:10px;color:#7e90a6}
+.feed-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:11px}.refresh{font-size:10px;color:#607188}.feed{max-height:740px;overflow:auto;padding-right:4px}.alert{padding:16px;margin-bottom:11px;border-radius:12px;border:1px solid #24374d;border-left:4px solid var(--red);background:#07101a}.alert-top{display:flex;justify-content:space-between;gap:15px}.alert-name{font-weight:900;font-size:16px}.score{text-align:right;font-size:22px;font-weight:900}.score-label{font-size:8px;color:#607188}.meta{color:#8293aa;font-size:10px;line-height:1.7;margin-top:6px}.badge{display:inline-block;margin-top:7px;padding:4px 7px;border-radius:5px;font-size:8px;font-weight:900;background:#34151e;color:#ff8191}.det{margin-top:10px;padding:9px 10px;border-radius:8px;background:#0d1927;color:#a8b6c9;font-size:10px}.evidence{margin-top:12px;padding-top:10px;border-top:1px solid #1b2b3c}.ev-title{font-size:11px;font-weight:800;margin-bottom:7px}.ev{display:flex;justify-content:space-between;gap:10px;padding:4px 0;color:#8a9aae;font-size:9px}.ev b{color:#d8e5f3;text-align:right}.empty{text-align:center;padding:100px 20px;color:#5d6f87;font-size:12px}
+.footer{text-align:center;color:#4f6077;font-size:9px;margin:18px}.notice{margin-top:10px;padding:9px;border-radius:8px;background:#0b1622;border:1px solid #1a2b3e;color:#74869d;font-size:9px;line-height:1.5}
+@media(max-width:1100px){.stats{grid-template-columns:repeat(3,1fr)}.main{grid-template-columns:1fr}}@media(max-width:650px){.container{padding:17px}.header{padding:0 16px}.stats{grid-template-columns:repeat(2,1fr)}.hero{align-items:flex-start;flex-direction:column}.mode-strip{width:100%}}
+</style>
+</head>
+<body>
+<header class="header"><div class="logo">CODE<span>ZILLA</span></div><div class="status"><span class="dot" id="statusDot"></span><span id="apiStatus">CHECKING API...</span></div></header>
+<main class="container">
+<section class="hero">
+  <div><h1>Security Operations Center</h1><p>Passive AI threat detection, live telemetry, evidence and correlation.</p></div>
+  <div class="mode-strip"><span class="mode-badge active" id="liveBadge">â— LIVE MONITOR</span><span class="mode-badge" id="replayBadge">VERIFIED REPLAY</span><span class="mode-badge">READ-ONLY</span><span class="mode-badge">NO DECRYPTION</span></div>
+</section>
+<section class="stats">
+  <div class="stat"><div class="label">TOTAL INCIDENTS</div><div class="value" id="totalAlerts">0</div></div>
+  <div class="stat"><div class="label">HIGH / CRITICAL</div><div class="value" id="highAlerts">0</div></div>
+  <div class="stat"><div class="label">AI DETECTORS</div><div class="value">4</div></div>
+  <div class="stat"><div class="label">PACKETS / SEC</div><div class="value live-value" id="pps">0</div></div>
+  <div class="stat"><div class="label">FLOWS / SEC</div><div class="value live-value" id="fps">0</div></div>
+  <div class="stat"><div class="label">WINDOWS</div><div class="value live-value" id="windows">0</div></div>
+</section>
+<section class="main">
+  <aside class="panel">
+    <h2 class="title">Live Monitoring</h2><p class="sub">Observe traffic from your own interface. No packets are transmitted.</p>
+    <div class="controls">
+      <select class="select" id="iface"><option value="">Default capture interface</option></select>
+      <div class="control-row"><button class="btn primary" id="startBtn" onclick="startLive()">START LIVE</button><button class="btn stop" id="stopBtn" onclick="stopLive()" disabled>STOP</button></div>
+    </div>
+    <div class="monitor-card"><div class="monitor-head"><b>CAPTURE ENGINE</b><span class="capture-state" id="captureState">STOPPED</span></div><div class="meter"><div id="meterBar"></div></div><div class="mini"><div><b id="seen">0</b><span>packets seen</span></div><div><b id="flowsSeen">0</b><span>flows observed</span></div><div><b id="detections">0</b><span>live detections</span></div><div><b id="lastWindow">â€”</b><span>last window</span></div></div></div>
+    <div class="notice"><b>Live mode:</b> captures metadata only. On Windows, Scapy requires Npcap. Run the terminal as Administrator if capture permissions are required.</div>
+    <h2 class="title" style="margin-top:18px">Verified Attack Replay</h2><p class="sub">Deterministic benchmark scenarios through the same production ML pipeline.</p>
+    <div class="scenarios">
+      <button class="scenario" onclick="runScenario('dns')"><strong>DNS THREAT</strong><small>Suspicious DNS behaviour</small></button>
+      <button class="scenario" onclick="runScenario('c2')"><strong>C2 ACTIVITY</strong><small>Real C2 HGB V3 inference</small></button>
+      <button class="scenario" onclick="runScenario('encrypted')"><strong>ENCRYPTED TRAFFIC</strong><small>Metadata-only encrypted-flow detection</small></button>
+      <button class="scenario ddos" onclick="runScenario('ddos')"><strong>DDoS ATTACK</strong><small>Verified temporal attack window</small></button>
+      <button class="scenario corr" onclick="runScenario('correlated')"><strong>âš  CORRELATED ATTACK</strong><small>C2 + DNS + encrypted evidence</small></button>
+      <button class="btn replay" onclick="runReplay()">â–¶ RUN FULL VERIFIED REPLAY</button>
+    </div>
+    <div class="message" id="message"></div>
+  </aside>
+  <section class="panel"><div class="feed-head"><div><h2 class="title">Live Threat Feed</h2><div class="sub" style="margin-bottom:0">AI detections from live capture or verified replay.</div></div><div class="refresh">AUTO REFRESH 1.5s</div></div><div class="feed" id="alerts"><div class="empty">No incidents yet.<br><br>Start live monitoring or run the verified replay.</div></div></section>
+</section>
+<div class="footer">CODEZILLA â€¢ Passive Multi-Detector AI Security Platform</div>
+</main>
+<script>
+const API="";
+const $=id=>document.getElementById(id);
+async function checkHealth(){try{let r=await fetch(API+"/health");if(!r.ok)throw new Error();$("apiStatus").textContent="API ONLINE";$("statusDot").style.background="var(--green)";}catch(e){$("apiStatus").textContent="API OFFLINE";$("statusDot").style.background="var(--red)";}}
+async function loadInterfaces(){try{let r=await fetch(API+"/live/interfaces");let d=await r.json();let s=$("iface");(d.interfaces||[]).forEach(x=>{let o=document.createElement("option");o.value=x;o.textContent=x;s.appendChild(o);});}catch(e){}}
+async function startLive(){
+  let iface=$("iface").value; $("message").textContent="Starting passive capture...";
+  try{let url=API+"/live/start"+(iface?"?interface="+encodeURIComponent(iface):"");let r=await fetch(url,{method:"POST"});let d=await r.json();if(!r.ok)throw new Error(d.detail||"Unable to start capture");$("message").textContent="LIVE MONITORING ACTIVE";$("startBtn").disabled=true;$("stopBtn").disabled=false;}
+  catch(e){$("message").textContent="Live capture error: "+e.message;}
+}
+async function stopLive(){try{await fetch(API+"/live/stop",{method:"POST"});$("message").textContent="Live monitoring stopped.";}finally{$("startBtn").disabled=false;$("stopBtn").disabled=true;}}
+async function pollLive(){try{let r=await fetch(API+"/live/status");let d=await r.json();$("pps").textContent=Math.round(d.packet_rate||0);$("fps").textContent=(d.flow_rate||0).toFixed(1);$("windows").textContent=d.windows_processed||0;$("seen").textContent=d.packets_seen||0;$("flowsSeen").textContent=d.flows_seen||0;$("detections").textContent=d.detections||0;$("lastWindow").textContent=d.last_window?d.last_window.slice(11,19):"â€”";$("captureState").textContent=d.running?"CAPTURING":"STOPPED";$("captureState").className="capture-state "+(d.running?"live":"");$("meterBar").style.width=Math.min(100,Math.round((d.packet_rate||0)/10))+"%";if(d.last_error)$("message").textContent=d.last_error;}catch(e){}}
+async function runScenario(s){$("message").textContent="Running "+s.toUpperCase()+"...";let endpoint=s==='ddos'?"/demo/ddos":"/demo/"+encodeURIComponent(s);try{let r=await fetch(API+endpoint,{method:"POST"});let d=await r.json();if(!r.ok)throw new Error(d.detail||"Detection failed");$("message").textContent=s.toUpperCase()+" completed: "+(d.prediction||"OK");await loadAlerts();}catch(e){$("message").textContent="Replay error: "+e.message;}}
+async function runReplay(){$("message").textContent="Running full verified attack replay...";try{let r=await fetch(API+"/demo/replay-live",{method:"POST"});let d=await r.json();if(!r.ok)throw new Error(d.detail||"Replay failed");$("message").textContent="Verified replay started â€” watch the feed.";}catch(e){$("message").textContent="Replay error: "+e.message;}}
+function escapeHtml(v){return String(v??"").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));}
+function renderAlerts(items){if(!items.length){$("alerts").innerHTML='<div class="empty">No threat alerts yet.<br><br>Live traffic is being observed passively.</div>';return;}$("alerts").innerHTML=items.map(a=>{let ev=(a.evidence||[]).slice(0,8);let threats=(a.threats||[]).map(t=>t.detector).join(" + ");let score=(Number(a.score||0)*100).toFixed(1)+"%";return `<article class="alert"><div class="alert-top"><div><div class="alert-name">${escapeHtml(a.primary_threat||"THREAT")}</div><div class="meta">Source: ${escapeHtml(a.source||"Global / observed")}<br>Time: ${escapeHtml(a.time_window||"â€”")}</div><span class="badge">${escapeHtml(a.severity||"HIGH")}</span></div><div class="score">${score}<div class="score-label">CONFIDENCE</div></div></div><div class="det">Detectors: ${escapeHtml(threats||a.primary_threat||"â€”")}<br>Active: ${escapeHtml(a.detector_count||1)}</div><div class="evidence"><div class="ev-title">Supporting Evidence</div>${ev.length?ev.map(x=>`<div class="ev"><span>${escapeHtml(x.feature||x.signal||"signal")}</span><b>${escapeHtml(x.feature_value??x.value??x.contribution??"")}</b></div>`).join(""):"<div class='meta'>No evidence provided.</div>"}</div></article>`;}).join("");}
+async function loadAlerts(){try{let r=await fetch(API+"/alerts");let d=await r.json();let items=d.alerts||[];$("totalAlerts").textContent=items.length;$("highAlerts").textContent=items.filter(x=>["HIGH","CRITICAL"].includes(String(x.severity).toUpperCase())).length;renderAlerts(items);}catch(e){}}
+checkHealth();loadInterfaces();loadAlerts();pollLive();setInterval(checkHealth,5000);setInterval(pollLive,1500);setInterval(loadAlerts,1500);
+</script>
+</body>
+</html>
+
+
+==================== E:\CODEZILLA-SIH26145\src\alert_schema.py ====================
+
+from dataclasses import dataclass, field
+from typing import Any
+
+
+@dataclass
+class EvidenceFeature:
+    feature: str
+    value: float
+    contribution: float
+
+
+@dataclass
+class MLAlert:
+    timestamp: str
+    flow_id: str
+    threat_class: str
+    prediction: str
+    model_score: float
+    severity: str
+    evidence: list[EvidenceFeature] = field(
+        default_factory=list
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "timestamp": self.timestamp,
+            "flow_id": self.flow_id,
+            "threat_class": self.threat_class,
+            "prediction": self.prediction,
+            "model_score": self.model_score,
+            "severity": self.severity,
+            "evidence": [
+                {
+                    "feature": item.feature,
+                    "value": item.value,
+                    "contribution": item.contribution
+                }
+                for item in self.evidence
+            ]
+        }
+
+
+==================== E:\CODEZILLA-SIH26145\src\detection_engine.py ====================
+
+"""
+CODEZILLA UNIFIED DETECTION ENGINE
+
+Runs DDoS, C2, DNS, and encrypted-traffic detectors
+and combines their outputs at event level.
+
+Event identity:
+    SrcAddr + time_window
+
+Passive / read-only.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Dict, Optional
+
+import pandas as pd
+
+from src.detectors import dos_detector
+from src.detectors import c2_detector
+from src.detectors import dns_detector
+from src.detectors import encrypted_detector
+
+from src.feature_router import (
+    route_dns,
+    route_encrypted,
+)
+
+from src.detector_adapter import (
+    normalize_result,
+)
+
+from src.threat_fusion import (
+    fuse_results,
+)
+
+
+# ============================================================
+# HELPER â€” ADD CONTEXT
+# ============================================================
+
+def _attach_context(
+    source_dataframe: pd.DataFrame,
+    results: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """
+    Attach source/time information to detector results.
+    """
+
+    output = []
+
+    for index, result in enumerate(results):
+
+        result = dict(result)
+
+        if "SrcAddr" in source_dataframe.columns:
+
+            result["SrcAddr"] = (
+                source_dataframe.iloc[index]["SrcAddr"]
+            )
+
+        if "time_window" in source_dataframe.columns:
+
+            result["time_window"] = (
+                source_dataframe.iloc[index]["time_window"]
+            )
+
+        output.append(result)
+
+    return output
+
+
+# ============================================================
+# HELPER â€” ADD RESULTS TO EVENT BUCKET
+# ============================================================
+
+def _add_results(
+    events: dict,
+    results: list[dict[str, Any]],
+) -> None:
+
+    for result in results:
+
+        source = result.get(
+            "SrcAddr",
+            "UNKNOWN"
+        )
+
+        time_window = result.get(
+            "time_window",
+            "UNKNOWN"
+        )
+
+        key = (
+            source,
+            time_window
+        )
+
+        events.setdefault(
+            key,
+            []
+        ).append(result)
+
+
+# ============================================================
+# MAIN ENGINE
+# ============================================================
+
+def analyze_events(
+    *,
+    ddos_data: Optional[pd.DataFrame] = None,
+    c2_data: Optional[pd.DataFrame] = None,
+    dns_data: Optional[pd.DataFrame] = None,
+    encrypted_data: Optional[pd.DataFrame] = None,
+    top_k: int = 5,
+) -> pd.DataFrame:
+    """
+    Run all available detectors.
+
+    Each detector can receive its own feature dataframe.
+    This is necessary because the detectors use different
+    feature schemas.
+    """
+
+    events: dict[
+        tuple,
+        list[dict[str, Any]]
+    ] = {}
+
+    # ========================================================
+    # DDoS
+    # ========================================================
+
+    if ddos_data is not None:
+
+        ddos_results = dos_detector.detect(
+            ddos_data,
+            top_k=top_k
+        )
+
+        ddos_results = _attach_context(
+            ddos_data,
+            ddos_results
+        )
+
+        normalized_ddos = []
+
+        for result in ddos_results:
+
+            normalized_ddos.append(
+                normalize_result(
+                    result,
+                    "DDoS"
+                )
+                | {
+                    "SrcAddr": result.get(
+                        "SrcAddr"
+                    ),
+                    "time_window": result.get(
+                        "time_window"
+                    )
+                }
+            )
+
+        _add_results(
+            events,
+            normalized_ddos
+        )
+
+    # ========================================================
+    # C2
+    # ========================================================
+
+    if c2_data is not None:
+
+        c2_results = c2_detector.detect(
+            c2_data,
+            top_k=top_k
+        )
+
+        c2_results = _attach_context(
+            c2_data,
+            c2_results
+        )
+
+        normalized_c2 = []
+
+        for result in c2_results:
+
+            normalized_c2.append(
+                normalize_result(
+                    result,
+                    "C2"
+                )
+                | {
+                    "SrcAddr": result.get(
+                        "SrcAddr"
+                    ),
+                    "time_window": result.get(
+                        "time_window"
+                    )
+                }
+            )
+
+        _add_results(
+            events,
+            normalized_c2
+        )
+
+    # ========================================================
+    # DNS
+    # ========================================================
+
+    if dns_data is not None:
+
+        dns_features = route_dns(
+            dns_data
+        )
+
+        dns_results = dns_detector.detect(
+            dns_features,
+            top_k=top_k
+        )
+
+        dns_results = _attach_context(
+            dns_data,
+            dns_results
+        )
+
+        normalized_dns = []
+
+        for result in dns_results:
+
+            normalized_dns.append(
+                normalize_result(
+                    result,
+                    "DNS"
+                )
+                | {
+                    "SrcAddr": result.get(
+                        "SrcAddr"
+                    ),
+                    "time_window": result.get(
+                        "time_window"
+                    )
+                }
+            )
+
+        _add_results(
+            events,
+            normalized_dns
+        )
+
+    # ========================================================
+    # ENCRYPTED TRAFFIC
+    # ========================================================
+
+    if encrypted_data is not None:
+
+        encrypted_features = route_encrypted(
+            encrypted_data
+        )
+
+        encrypted_results = (
+            encrypted_detector.detect(
+                encrypted_features,
+                top_k=top_k
+            )
+        )
+
+        encrypted_results = _attach_context(
+            encrypted_data,
+            encrypted_results
+        )
+
+        normalized_encrypted = []
+
+        for result in encrypted_results:
+
+            normalized_encrypted.append(
+                normalize_result(
+                    result,
+                    "ENCRYPTED_TRAFFIC"
+                )
+                | {
+                    "SrcAddr": result.get(
+                        "SrcAddr"
+                    ),
+                    "time_window": result.get(
+                        "time_window"
+                    )
+                }
+            )
+
+        _add_results(
+            events,
+            normalized_encrypted
+        )
+
+    # ========================================================
+    # FUSION
+    # ========================================================
+
+    final_rows = []
+
+    for (
+        source,
+        time_window
+    ), detector_results in events.items():
+
+        fusion = fuse_results(
+            detector_results
+        )
+
+        final_rows.append({
+
+            "SrcAddr": source,
+
+            "time_window": time_window,
+
+            "prediction": fusion[
+                "prediction"
+            ],
+
+            "severity": fusion[
+                "severity"
+            ],
+
+            "score": fusion[
+                "score"
+            ],
+
+            "primary_threat": fusion[
+                "primary_threat"
+            ],
+
+            "detector_count": len(
+                fusion.get(
+                    "threats",
+                    []
+                )
+            ),
+
+            "threats": fusion.get(
+                "threats",
+                []
+            ),
+
+            "evidence": fusion.get(
+                "evidence",
+                []
+            ),
+        })
+
+    if not final_rows:
+
+        return pd.DataFrame(
+            columns=[
+                "SrcAddr",
+                "time_window",
+                "prediction",
+                "severity",
+                "score",
+                "primary_threat",
+                "detector_count",
+                "threats",
+                "evidence",
+            ]
+        )
+
+    return (
+        pd.DataFrame(final_rows)
+        .sort_values(
+            [
+                "time_window",
+                "score"
+            ],
+            ascending=[
+                True,
+                False
+            ]
+        )
+        .reset_index(drop=True)
+    )
+
+
+==================== E:\CODEZILLA-SIH26145\src\detector_adapter.py ====================
+
+"""
+CODEZILLA DETECTOR ADAPTER
+
+Normalizes outputs from different detector families into
+one common structure for the fusion engine.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Dict
+
+
+def normalize_result(
+    result: Dict[str, Any],
+    detector_name: str,
+) -> Dict[str, Any]:
+    """
+    Convert a detector-specific result into the common
+    CODEZILLA result schema.
+    """
+
+    prediction = str(
+        result.get(
+            "prediction",
+            "BENIGN"
+        )
+    ).upper()
+
+    # --------------------------------------------------------
+    # Normalize benign / malicious state
+    # --------------------------------------------------------
+
+    is_threat = prediction not in {
+        "BENIGN",
+        "NORMAL",
+        "SAFE",
+        "NO_THREAT",
+    }
+
+    # --------------------------------------------------------
+    # Threat class
+    # --------------------------------------------------------
+
+    threat_class = result.get(
+        "threat_class"
+    )
+
+    if threat_class is None:
+        threat_class = detector_name
+
+    # --------------------------------------------------------
+    # Score
+    # --------------------------------------------------------
+
+    try:
+        score = float(
+            result.get(
+                "model_score",
+                0.0
+            )
+        )
+    except (
+        TypeError,
+        ValueError
+    ):
+        score = 0.0
+
+    score = max(
+        0.0,
+        min(
+            1.0,
+            score
+        )
+    )
+
+    # --------------------------------------------------------
+    # Severity
+    # --------------------------------------------------------
+
+    severity = str(
+        result.get(
+            "severity",
+            "LOW"
+        )
+    ).upper()
+
+    if is_threat and severity == "LOW":
+
+        if score >= 0.95:
+            severity = "HIGH"
+
+        elif score >= 0.75:
+            severity = "MEDIUM"
+
+    # --------------------------------------------------------
+    # Common structure
+    # --------------------------------------------------------
+
+    return {
+        "detector": detector_name,
+        "prediction": (
+            prediction
+            if is_threat
+            else "BENIGN"
+        ),
+        "model_score": round(
+            score,
+            4
+        ),
+        "threat_class": str(
+            threat_class
+        ),
+        "severity": severity,
+        "supporting_features": result.get(
+            "supporting_features",
+            []
+        ),
+    }
+
+
+==================== E:\CODEZILLA-SIH26145\src\feature_router.py ====================
+
+"""
+CODEZILLA FEATURE ROUTER
+
+Routes a unified traffic/window DataFrame to the feature
+schemas required by individual detectors.
+
+This module does not perform detection itself.
+"""
+
+from __future__ import annotations
+
+from typing import Dict, List
+import pandas as pd
+
+
+# ============================================================
+# FEATURE SCHEMAS
+# ============================================================
+
+DNS_FEATURES = [
+    "dns_query_rate",
+    "dns_unique_destinations",
+    "dns_packet_concentration",
+    "dns_byte_concentration",
+    "dns_iat_cv",
+    "query_rate_prev",
+    "query_rate_roll3",
+    "query_rate_roll6",
+    "query_rate_std6",
+    "query_rate_change",
+    "query_rate_z6",
+    "destination_change",
+    "bytes_per_query",
+    "packets_per_query",
+]
+
+
+ENCRYPTED_FEATURES = [
+    "encrypted_flow_count",
+    "encrypted_total_packets",
+    "encrypted_total_bytes",
+    "encrypted_unique_destinations",
+    "encrypted_unique_ports",
+    "encrypted_mean_duration",
+    "bytes_per_flow",
+    "packets_per_flow",
+    "flow_count_change",
+    "bytes_change",
+    "destination_change",
+]
+
+
+def get_available_features(
+    dataframe: pd.DataFrame,
+    required_features: List[str],
+) -> List[str]:
+    """
+    Return the required features that actually exist.
+    """
+
+    return [
+        feature
+        for feature in required_features
+        if feature in dataframe.columns
+    ]
+
+
+def has_features(
+    dataframe: pd.DataFrame,
+    required_features: List[str],
+) -> bool:
+    """
+    Check whether all required features are available.
+    """
+
+    return all(
+        feature in dataframe.columns
+        for feature in required_features
+    )
+
+
+def route_dns(
+    dataframe: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Return DNS model features if available.
+    """
+
+    missing = [
+        feature
+        for feature in DNS_FEATURES
+        if feature not in dataframe.columns
+    ]
+
+    if missing:
+        raise ValueError(
+            "DNS features missing: "
+            + ", ".join(missing)
+        )
+
+    return dataframe[DNS_FEATURES].copy()
+
+
+def route_encrypted(
+    dataframe: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Return encrypted-traffic model features if available.
+    """
+
+    missing = [
+        feature
+        for feature in ENCRYPTED_FEATURES
+        if feature not in dataframe.columns
+    ]
+
+    if missing:
+        raise ValueError(
+            "Encrypted features missing: "
+            + ", ".join(missing)
+        )
+
+    return dataframe[
+        ENCRYPTED_FEATURES
+    ].copy()
+
+
+def describe_features(
+    dataframe: pd.DataFrame,
+) -> Dict[str, List[str]]:
+    """
+    Describe which detector schemas can be satisfied.
+    """
+
+    return {
+        "DNS": get_available_features(
+            dataframe,
+            DNS_FEATURES,
+        ),
+
+        "ENCRYPTED_TRAFFIC": get_available_features(
+            dataframe,
+            ENCRYPTED_FEATURES,
+        ),
+    }
+
+
+==================== E:\CODEZILLA-SIH26145\src\live_monitor.py ====================
+
+"""
+CODEZILLA live passive traffic monitor.
+
+This module captures traffic only; it never injects, blocks, probes,
+or decrypts packets. It aggregates observed metadata into short windows
+and feeds compatible behavioral features into the existing CODEZILLA
+ML detector service.
+
+Windows: Scapy + Npcap are required for live capture on Windows.
+"""
+from __future__ import annotations
+
+import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any, Callable, Deque, Dict, List, Optional, Tuple
+
+import math
+import pandas as pd
+
+
+FlowKey = Tuple[str, str, int, int, str]
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        value = float(value)
+        return value if math.isfinite(value) else default
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_div(a: float, b: float) -> float:
+    return float(a) / float(b) if b else 0.0
+
+
+@dataclass
+class Flow:
+    src: str
+    dst: str
+    sport: int
+    dport: int
+    proto: str
+    first_ts: float
+    last_ts: float
+    packets: int = 0
+    bytes: int = 0
+    syn: int = 0
+    ack: int = 0
+    rst: int = 0
+
+    @property
+    def duration(self) -> float:
+        return max(0.0, self.last_ts - self.first_ts)
+
+
+@dataclass
+class LiveState:
+    running: bool = False
+    interface: Optional[str] = None
+    started_at: Optional[str] = None
+    packets_seen: int = 0
+    bytes_seen: int = 0
+    windows_processed: int = 0
+    last_window: Optional[str] = None
+    flows_seen: int = 0
+    last_error: Optional[str] = None
+    packet_rate: float = 0.0
+    byte_rate: float = 0.0
+    flow_rate: float = 0.0
+    detections: int = 0
+    last_detection: Optional[Dict[str, Any]] = None
+    detector_status: Dict[str, str] = field(default_factory=lambda: {
+        "DDoS": "READY",
+        "C2": "READY",
+        "DNS": "READY",
+        "ENCRYPTED_TRAFFIC": "READY",
+    })
+
+
+class LiveMonitor:
+    """Threaded passive monitor with detector-specific feature adapters."""
+
+    def __init__(
+        self,
+        detect_callback: Callable[[Dict[str, Any]], Dict[str, Any]],
+        default_window_seconds: int = 5,
+    ) -> None:
+        self.detect_callback = detect_callback
+        self.default_window_seconds = default_window_seconds
+        self.state = LiveState()
+        self._lock = threading.RLock()
+        self._thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+        self._flows: Dict[FlowKey, Flow] = {}
+        self._window_started: Optional[float] = None
+        self._history_ddos: Deque[Dict[str, float]] = deque(maxlen=8)
+        self._history_c2: Deque[Dict[str, float]] = deque(maxlen=30)
+        self._history_dns: Deque[Dict[str, float]] = deque(maxlen=10)
+        self._history_encrypted: Deque[Dict[str, float]] = deque(maxlen=10)
+        self._recent_packets: Deque[Tuple[float, str, str, int, int, str, int]] = deque(maxlen=50000)
+
+    # ------------------------------------------------------------------
+    # Public control
+    # ------------------------------------------------------------------
+    def list_interfaces(self) -> List[str]:
+        try:
+            from scapy.all import get_if_list
+            return list(get_if_list())
+        except Exception as exc:  # pragma: no cover - environment dependent
+            with self._lock:
+                self.state.last_error = str(exc)
+            return []
+
+    def start(self, interface: Optional[str] = None) -> Dict[str, Any]:
+        with self._lock:
+            if self.state.running:
+                return self.snapshot()
+            self.state = LiveState(
+                running=True,
+                interface=interface,
+                started_at=datetime.now(timezone.utc).isoformat(),
+            )
+            self._flows.clear()
+            self._recent_packets.clear()
+            self._history_ddos.clear()
+            self._history_c2.clear()
+            self._history_dns.clear()
+            self._history_encrypted.clear()
+            self._window_started = time.time()
+            self._stop_event.clear()
+            self._thread = threading.Thread(
+                target=self._capture_loop,
+                name="codezilla-live-capture",
+                daemon=True,
+            )
+            self._thread.start()
+        return self.snapshot()
+
+    def stop(self) -> Dict[str, Any]:
+        with self._lock:
+            if not self.state.running:
+                return self.snapshot()
+            self.state.running = False
+            self._stop_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=2.0)
+        with self._lock:
+            self._thread = None
+        return self.snapshot()
+
+    def snapshot(self) -> Dict[str, Any]:
+        with self._lock:
+            result = dict(self.state.__dict__)
+            now = time.time()
+            recent = [item for item in self._recent_packets if now - item[0] <= 5.0]
+            result["packet_rate"] = round(len(recent) / 5.0, 1)
+            result["byte_rate"] = round(sum(item[6] for item in recent) / 5.0, 1)
+            recent_flows = {(item[1], item[2], item[3], item[4], item[5]) for item in recent}
+            result["flow_rate"] = round(len(recent_flows) / 5.0, 1)
+            result["uptime_seconds"] = self._uptime_seconds()
+            return result
+
+    # ------------------------------------------------------------------
+    # Capture
+    # ------------------------------------------------------------------
+    def _capture_loop(self) -> None:
+        try:
+            from scapy.all import sniff
+
+            kwargs: Dict[str, Any] = {
+                "store": False,
+                "prn": self._packet_callback,
+            }
+            if self.state.interface:
+                kwargs["iface"] = self.state.interface
+
+            sniff(
+                stop_filter=lambda _pkt: self._stop_event.is_set(),
+                **kwargs,
+            )
+        except Exception as exc:  # pragma: no cover - environment dependent
+            with self._lock:
+                self.state.last_error = str(exc)
+                self.state.running = False
+        finally:
+            self._finalize_window(force=True)
+
+    def _packet_callback(self, packet: Any) -> None:
+        now = _safe_float(getattr(packet, "time", time.time()), time.time())
+        length = len(packet) if hasattr(packet, "__len__") else 0
+
+        try:
+            meta = self._packet_to_flow_meta(packet, now, length)
+        except Exception:
+            return
+
+        if meta is None:
+            with self._lock:
+                self.state.packets_seen += 1
+                self.state.bytes_seen += length
+            self._tick_window(now)
+            return
+
+        src, dst, sport, dport, proto, flags, payload_len = meta
+
+        with self._lock:
+            self.state.packets_seen += 1
+            self.state.bytes_seen += length
+            self._recent_packets.append((now, src, dst, sport, dport, proto, length))
+
+            key: FlowKey = (src, dst, sport, dport, proto)
+            flow = self._flows.get(key)
+            if flow is None:
+                flow = Flow(
+                    src=src,
+                    dst=dst,
+                    sport=sport,
+                    dport=dport,
+                    proto=proto,
+                    first_ts=now,
+                    last_ts=now,
+                )
+                self._flows[key] = flow
+                self.state.flows_seen += 1
+
+            flow.last_ts = now
+            flow.packets += 1
+            flow.bytes += max(0, payload_len)
+
+            flag_text = str(flags or "").upper()
+            flow.syn += int("S" in flag_text and "A" not in flag_text)
+            flow.ack += int("A" in flag_text)
+            flow.rst += int("R" in flag_text)
+
+        self._tick_window(now)
+
+    def _packet_to_flow_meta(self, packet: Any, ts: float, wire_len: int):
+        if not hasattr(packet, "haslayer") or not packet.haslayer("IP"):
+            return None
+
+        ip = packet["IP"]
+        src = str(getattr(ip, "src", ""))
+        dst = str(getattr(ip, "dst", ""))
+        proto_num = int(getattr(ip, "proto", 0) or 0)
+
+        if packet.haslayer("TCP"):
+            tcp = packet["TCP"]
+            sport = int(getattr(tcp, "sport", 0) or 0)
+            dport = int(getattr(tcp, "dport", 0) or 0)
+            flags = str(getattr(tcp, "flags", ""))
+            payload_len = max(0, wire_len - 40)
+            proto = "TCP"
+        elif packet.haslayer("UDP"):
+            udp = packet["UDP"]
+            sport = int(getattr(udp, "sport", 0) or 0)
+            dport = int(getattr(udp, "dport", 0) or 0)
+            flags = ""
+            payload_len = max(0, wire_len - 28)
+            proto = "UDP"
+        else:
+            sport = 0
+            dport = 0
+            flags = ""
+            payload_len = max(0, wire_len - 20)
+            proto = str(proto_num)
+
+        return src, dst, sport, dport, proto, flags, payload_len
+
+    def _tick_window(self, now: float) -> None:
+        start = self._window_started
+        if start is None:
+            self._window_started = now
+            return
+        if now - start >= self.default_window_seconds:
+            self._finalize_window()
+            self._window_started = now
+
+    # ------------------------------------------------------------------
+    # Feature construction
+    # ------------------------------------------------------------------
+    def _finalize_window(self, force: bool = False) -> None:
+        with self._lock:
+            if not self._flows:
+                return
+            flows = list(self._flows.values())
+            self._flows = {}
+            window_time = datetime.fromtimestamp(
+                self._window_started or time.time(), timezone.utc
+            ).replace(microsecond=0).isoformat()
+            self.state.windows_processed += 1
+            self.state.last_window = window_time
+
+            elapsed = max(1.0, self.default_window_seconds)
+            self.state.packet_rate = self.state.packets_seen / max(elapsed, 1.0)
+            self.state.byte_rate = self.state.bytes_seen / max(elapsed, 1.0)
+            self.state.flow_rate = len(flows) / max(elapsed, 1.0)
+
+        try:
+            payload: Dict[str, Any] = {
+                "source": self._dominant_source(flows),
+                "time_window": window_time,
+                # DDoS/C2 are window-level behavioral detectors and can
+                # operate on the complete observed flow set.
+                "ddos_features": self._build_ddos(flows),
+                "c2_features": self._build_c2(flows),
+            }
+
+            # DNS and encrypted-traffic detectors must NOT be invoked
+            # with an all-zero feature vector when the current window
+            # contains no matching traffic. Doing so can create a
+            # high-confidence false alert from an out-of-domain input.
+            dns_features = self._build_dns(flows)
+            if dns_features is not None:
+                payload["dns_features"] = dns_features
+
+            encrypted_features = self._build_encrypted(flows)
+            if encrypted_features is not None:
+                payload["encrypted_features"] = encrypted_features
+            result = self.detect_callback(payload)
+            with self._lock:
+                if result.get("prediction") == "THREAT":
+                    self.state.detections += 1
+                    self.state.last_detection = result
+        except Exception as exc:
+            with self._lock:
+                self.state.last_error = str(exc)
+
+    @staticmethod
+    def _dominant_source(flows: List[Flow]) -> Optional[str]:
+        counts: Dict[str, int] = defaultdict(int)
+        for f in flows:
+            counts[f.src] += f.packets
+        return max(counts, key=counts.get) if counts else None
+
+    @staticmethod
+    def _base_stats(flows: List[Flow]) -> Dict[str, float]:
+        if not flows:
+            return {}
+        packets = [float(f.packets) for f in flows]
+        bytes_ = [float(f.bytes) for f in flows]
+        duration = [float(f.duration) for f in flows]
+        elapsed = max(0.001, max(f.last_ts for f in flows) - min(f.first_ts for f in flows))
+        iats = []
+        timestamps = sorted(f.first_ts for f in flows)
+        for a, b in zip(timestamps, timestamps[1:]):
+            iats.append(max(0.0, b - a))
+        mean_iat = sum(iats) / len(iats) if iats else 0.0
+        mean_d = sum(duration) / len(duration)
+        return {
+            "flow_count": float(len(flows)),
+            "total_packets": float(sum(packets)),
+            "total_bytes": float(sum(bytes_)),
+            "mean_flow_duration": mean_d,
+            "median_flow_duration": float(pd.Series(duration).median()) if duration else 0.0,
+            "mean_packets_per_second": _safe_div(sum(packets), elapsed),
+            "max_packets_per_second": max((_safe_div(p, max(d, 0.001)) for p, d in zip(packets, duration)), default=0.0),
+            "mean_bytes_per_second": _safe_div(sum(bytes_), elapsed),
+            "max_bytes_per_second": max((_safe_div(b, max(d, 0.001)) for b, d in zip(bytes_, duration)), default=0.0),
+            "mean_packet_size": _safe_div(sum(bytes_), sum(packets)),
+            "mean_iat": mean_iat,
+            "mean_syn_count": _safe_div(sum(f.syn for f in flows), len(flows)),
+            "mean_ack_count": _safe_div(sum(f.ack for f in flows), len(flows)),
+            "mean_rst_count": _safe_div(sum(f.rst for f in flows), len(flows)),
+        }
+
+    def _with_lags_roll3(
+        self,
+        current: Dict[str, float],
+        history: Deque[Dict[str, float]],
+        bases: List[str],
+    ) -> Dict[str, float]:
+        out = dict(current)
+        previous = list(history)[-3:][::-1]
+        for col in bases:
+            out[f"{col}_lag1"] = previous[0].get(col, 0.0) if previous else 0.0
+            out[f"{col}_lag2"] = previous[1].get(col, 0.0) if len(previous) > 1 else 0.0
+            out[f"{col}_lag3"] = previous[2].get(col, 0.0) if len(previous) > 2 else 0.0
+            vals = [x.get(col, 0.0) for x in list(history)[-3:]]
+            out[f"{col}_rolling3"] = sum(vals) / len(vals) if vals else 0.0
+        return out
+
+    def _build_ddos(self, flows: List[Flow]) -> Dict[str, float]:
+        base = self._base_stats(flows)
+        cols = [
+            "flow_count", "total_packets", "total_bytes",
+            "mean_packets_per_second",
+            "max_packets_per_second", "mean_bytes_per_second",
+            "max_bytes_per_second", "mean_packet_size", "mean_iat",
+            "mean_syn_count", "mean_ack_count", "mean_rst_count",
+        ]
+        feat = self._with_lags_roll3(base, self._history_ddos, cols)
+        self._history_ddos.append(base)
+        return feat
+
+    # C2 feature builder follows the deployed training schema: source-centric
+    # behavioral windows + past-only history. It is intentionally metadata-only.
+    def _build_c2(self, flows: List[Flow]) -> Dict[str, float]:
+        if not flows:
+            return {"flow_count": 0.0}
+        pair_counts: Dict[Tuple[str, int], int] = defaultdict(int)
+        dst_counts: Dict[str, int] = defaultdict(int)
+        for f in flows:
+            pair_counts[(f.dst, f.dport)] += 1
+            dst_counts[f.dst] += 1
+
+        pair_iats: List[float] = []
+        ordered = sorted(flows, key=lambda x: x.first_ts)
+        last_by_pair: Dict[Tuple[str, int, str], float] = {}
+        for f in ordered:
+            key = (f.dst, f.dport, f.proto)
+            if key in last_by_pair:
+                pair_iats.append(max(0.0, f.first_ts - last_by_pair[key]))
+            last_by_pair[key] = f.first_ts
+
+        def mean(vals): return sum(vals) / len(vals) if vals else 0.0
+        def std(vals):
+            if len(vals) < 2: return 0.0
+            m = mean(vals)
+            return math.sqrt(sum((x-m)**2 for x in vals) / (len(vals)-1))
+
+        flow_count = float(len(flows))
+        total_packets = float(sum(f.packets for f in flows))
+        total_bytes = float(sum(f.bytes for f in flows))
+        iat_mean = mean(pair_iats)
+        iat_std = std(pair_iats)
+        iat_cv = _safe_div(iat_std, iat_mean)
+        max_pair = float(max(pair_counts.values(), default=0))
+        max_dst = float(max(dst_counts.values(), default=0))
+        entropy = 0.0
+        if dst_counts:
+            for n in dst_counts.values():
+                p = n / flow_count
+                entropy -= p * math.log2(p) if p > 0 else 0.0
+
+        current = {
+            "flow_count": flow_count,
+            "unique_destinations": float(len(dst_counts)),
+            "unique_ports": float(len({f.dport for f in flows})),
+            "total_packets": total_packets,
+            "total_bytes": total_bytes,
+            "mean_packets": _safe_div(total_packets, flow_count),
+            "mean_bytes": _safe_div(total_bytes, flow_count),
+            "mean_duration": mean([f.duration for f in flows]),
+            "max_destination_count": max_dst,
+            "destination_concentration": _safe_div(max_dst, flow_count),
+            "iat_mean": iat_mean,
+            "iat_std": iat_std,
+            "iat_median": float(pd.Series(pair_iats).median()) if pair_iats else 0.0,
+            "iat_min": min(pair_iats, default=0.0),
+            "iat_max": max(pair_iats, default=0.0),
+            "iat_cv": iat_cv,
+            "max_pair_repetition": max_pair,
+            "pair_repetition_ratio": _safe_div(max_pair, flow_count),
+            "destination_entropy": entropy,
+        }
+
+        hist = list(self._history_c2)
+        for col in [
+            "flow_count", "unique_destinations", "unique_ports", "total_packets",
+            "total_bytes", "destination_concentration", "iat_mean", "iat_cv",
+            "max_pair_repetition", "pair_repetition_ratio"
+        ]:
+            for n, min_count in [(6, 2), (12, 3), (24, 5)]:
+                vals = [x.get(col, 0.0) for x in hist[-n:] if x]
+                current[f"{col}_rolling{n}"] = mean(vals) if len(vals) >= min_count else 0.0
+
+        current["flow_rate_change"] = _safe_div(
+            current["flow_count"], current.get("flow_count_rolling12", 0.0) + 1e-6
+        )
+        current["byte_rate_change"] = _safe_div(
+            current["total_bytes"], current.get("total_bytes_rolling12", 0.0) + 1e-6
+        )
+        current["packet_rate_change"] = _safe_div(
+            current["total_packets"], current.get("total_packets_rolling12", 0.0) + 1e-6
+        )
+        pair_values = list(pair_counts.values())
+        current["max_pair_seen"] = max_pair
+        current["mean_pair_seen"] = mean(pair_values)
+        current["max_recent_contacts_60s"] = float(len({(f.dst, f.dport) for f in flows}))
+        current["mean_recent_contacts_60s"] = mean([1.0 for _ in flows])
+        current["max_recent_contacts_300s"] = current["max_recent_contacts_60s"]
+        current["mean_recent_contacts_300s"] = current["mean_recent_contacts_60s"]
+        current["median_pair_iat"] = current["iat_median"]
+        current["mean_pair_iat"] = current["iat_mean"]
+        current["std_pair_iat"] = current["iat_std"]
+        current["pair_iat_cv"] = current["iat_cv"]
+
+        self._history_c2.append(current.copy())
+        return current
+
+    def _build_dns(self, flows: List[Flow]) -> Optional[Dict[str, float]]:
+        def mean(vals: List[float]) -> float:
+            return sum(vals) / len(vals) if vals else 0.0
+
+        def std(vals: List[float]) -> float:
+            if len(vals) < 2:
+                return 0.0
+            m = mean(vals)
+            return math.sqrt(
+                sum((x - m) ** 2 for x in vals) / (len(vals) - 1)
+            )
+
+        dns = [f for f in flows if f.dport in (53, 853) or f.sport in (53, 853)]
+        if not dns:
+            return None
+        base = self._base_stats(dns)
+        source = defaultdict(list)
+        for f in dns:
+            source[f.src].append(f)
+        dominant = max(source.values(), key=len) if source else dns
+        packet_total = sum(f.packets for f in dominant)
+        byte_total = sum(f.bytes for f in dominant)
+        query_rate = _safe_div(len(dominant), max(self.default_window_seconds, 1))
+        dest_counts = defaultdict(int)
+        dest_bytes = defaultdict(int)
+        for f in dominant:
+            dest_counts[f.dst] += f.packets
+            dest_bytes[f.dst] += f.bytes
+        packet_conc = _safe_div(max(dest_counts.values(), default=0), packet_total)
+        byte_conc = _safe_div(max(dest_bytes.values(), default=0), byte_total)
+        timing = [max(0.0, b.first_ts-a.first_ts) for a,b in zip(sorted(dominant,key=lambda x:x.first_ts), sorted(dominant,key=lambda x:x.first_ts)[1:])]
+        cv = _safe_div(math.sqrt(sum((x-(sum(timing)/len(timing)))**2 for x in timing)/(len(timing)-1)) if len(timing)>1 else 0.0, sum(timing)/len(timing) if timing else 0.0)
+        hist = list(self._history_dns)
+        prior = hist[-1].get("dns_query_rate", query_rate) if hist else query_rate
+        roll3 = mean([x.get("dns_query_rate", 0.0) for x in hist[-3:]]) if hist else query_rate
+        roll6 = mean([x.get("dns_query_rate", 0.0) for x in hist[-6:]]) if hist else query_rate
+        std6 = std([x.get("dns_query_rate", 0.0) for x in hist[-6:]]) if hist else 0.0
+        current = {
+            "dns_query_rate": query_rate,
+            "dns_unique_destinations": float(len(dest_counts)),
+            "dns_packet_concentration": packet_conc,
+            "dns_byte_concentration": byte_conc,
+            "dns_iat_cv": cv,
+            "query_rate_prev": prior,
+            "query_rate_roll3": roll3,
+            "query_rate_roll6": roll6,
+            "query_rate_std6": std6,
+            "query_rate_change": query_rate - prior,
+            "query_rate_z6": _safe_div(query_rate-roll6, std6 or 1.0),
+            "destination_change": abs(float(len(dest_counts)) - (hist[-1].get("dns_unique_destinations", len(dest_counts)) if hist else len(dest_counts))),
+            "bytes_per_query": _safe_div(byte_total, len(dominant)),
+            "packets_per_query": _safe_div(packet_total, len(dominant)),
+        }
+        self._history_dns.append(current.copy())
+        return current
+
+    def _build_encrypted(self, flows: List[Flow]) -> Optional[Dict[str, float]]:
+        def mean(vals: List[float]) -> float:
+            return sum(vals) / len(vals) if vals else 0.0
+        encrypted = [
+            f for f in flows
+            if f.dport in (443, 8443, 853) or f.sport in (443, 8443, 853)
+        ]
+        if not encrypted:
+            return None
+        count = len(encrypted)
+        packets = sum(f.packets for f in encrypted)
+        bytes_ = sum(f.bytes for f in encrypted)
+        hist = list(self._history_encrypted)
+        current = {
+            "encrypted_flow_count": float(count),
+            "encrypted_total_packets": float(packets),
+            "encrypted_total_bytes": float(bytes_),
+            "encrypted_unique_destinations": float(len({f.dst for f in encrypted})),
+            "encrypted_unique_ports": float(len({f.dport for f in encrypted})),
+            "encrypted_mean_duration": mean([f.duration for f in encrypted]),
+            "bytes_per_flow": _safe_div(bytes_, count),
+            "packets_per_flow": _safe_div(packets, count),
+            "flow_count_change": float(count - (hist[-1].get("encrypted_flow_count", count) if hist else count)),
+            "bytes_change": float(bytes_ - (hist[-1].get("encrypted_total_bytes", bytes_) if hist else bytes_)),
+            "destination_change": float(len({f.dst for f in encrypted}) - (hist[-1].get("encrypted_unique_destinations", len({f.dst for f in encrypted})) if hist else len({f.dst for f in encrypted}))),
+        }
+        self._history_encrypted.append(current.copy())
+        return current
+
+    def _uptime_seconds(self) -> float:
+        with self._lock:
+            if not self.state.started_at:
+                return 0.0
+            try:
+                start = datetime.fromisoformat(self.state.started_at)
+                return max(0.0, (datetime.now(timezone.utc) - start).total_seconds())
+            except Exception:
+                return 0.0
+
+
+==================== E:\CODEZILLA-SIH26145\src\ml_predictor.py ====================
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Dict, List
+
+import sys
+import joblib
+import numpy as np
+import pandas as pd
+
+
+# ============================================================
+# CODEZILLA SHARED ML PREDICTOR
+# ============================================================
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+# ============================================================
+# COMPATIBILITY SHIM
+#
+# Some previously serialized sklearn models may reference
+# the private module "_loss" during pickle loading.
+#
+# Modern sklearn exposes this functionality as
+# "sklearn._loss".
+# ============================================================
+
+try:
+    import sklearn._loss as sklearn_loss
+
+    # Make old pickle references to "_loss" resolve to the
+    # currently installed sklearn._loss module.
+    sys.modules.setdefault(
+        "_loss",
+        sklearn_loss
+    )
+
+except ImportError as exc:
+    raise RuntimeError(
+        "Installed scikit-learn does not provide sklearn._loss. "
+        "Check the scikit-learn installation."
+    ) from exc
+
+
+# ============================================================
+# MODEL PATH
+# ============================================================
+
+MODEL_PATH = (
+    PROJECT_ROOT
+    / "models"
+    / "dos_hgb.joblib"
+)
+
+
+# ============================================================
+# LOAD MODEL
+# ============================================================
+
+try:
+
+    model = joblib.load(
+        MODEL_PATH
+    )
+
+except Exception as exc:
+
+    raise RuntimeError(
+        f"Could not load CODEZILLA DDoS model: "
+        f"{MODEL_PATH}\n"
+        f"Original error: {exc}"
+    ) from exc
+
+
+# ============================================================
+# PREDICTION FUNCTION
+# ============================================================
+
+def predict(
+    feature_dataframe: pd.DataFrame,
+    *,
+    include_evidence: bool = True,
+    top_k: int = 5,
+) -> List[Dict[str, Any]]:
+    """
+    Run the packaged DDoS model.
+
+    Parameters
+    ----------
+    feature_dataframe:
+        DataFrame containing the exact model features.
+
+    include_evidence:
+        Whether to include feature-evidence information.
+
+    top_k:
+        Number of evidence features to return.
+
+    Returns
+    -------
+    list[dict]
+        Structured DDoS predictions.
+    """
+
+    if not isinstance(
+        feature_dataframe,
+        pd.DataFrame
+    ):
+        raise TypeError(
+            "feature_dataframe must be a pandas DataFrame."
+        )
+
+    if feature_dataframe.empty:
+        return []
+
+    # --------------------------------------------------------
+    # Extract expected model features
+    # --------------------------------------------------------
+
+    if hasattr(
+        model,
+        "feature_names_in_"
+    ):
+
+        expected_features = list(
+            model.feature_names_in_
+        )
+
+        missing = [
+            feature
+            for feature in expected_features
+            if feature not in feature_dataframe.columns
+        ]
+
+        if missing:
+
+            raise ValueError(
+                "Missing model features: "
+                + ", ".join(missing)
+            )
+
+        X = feature_dataframe[
+            expected_features
+        ].copy()
+
+    else:
+
+        X = feature_dataframe.copy()
+
+    # --------------------------------------------------------
+    # Clean numeric data
+    # --------------------------------------------------------
+
+    X = (
+        X
+        .replace(
+            [np.inf, -np.inf],
+            np.nan
+        )
+        .fillna(0)
+    )
+
+    # --------------------------------------------------------
+    # Probability
+    # --------------------------------------------------------
+
+    if not hasattr(
+        model,
+        "predict_proba"
+    ):
+        raise TypeError(
+            "Loaded model does not support predict_proba()."
+        )
+
+    probabilities = (
+        model
+        .predict_proba(X)[:, 1]
+    )
+
+    # --------------------------------------------------------
+    # Decision threshold
+    #
+    # DDoS model metadata specifies 0.80.
+    # --------------------------------------------------------
+
+    decision_threshold = 0.80
+
+    predictions = (
+        probabilities >= decision_threshold
+    ).astype(int)
+
+    # --------------------------------------------------------
+    # Build results
+    # --------------------------------------------------------
+
+    results = []
+
+    for index, probability in enumerate(
+        probabilities
+    ):
+
+        probability = float(
+            probability
+        )
+
+        prediction = int(
+            predictions[index]
+        )
+
+        if prediction == 1:
+
+            label = "ATTACK"
+
+            if probability >= 0.95:
+                severity = "HIGH"
+
+            else:
+                severity = "MEDIUM"
+
+        else:
+
+            label = "BENIGN"
+            severity = "LOW"
+
+        supporting_features = []
+
+        # ----------------------------------------------------
+        # Basic evidence
+        # ----------------------------------------------------
+
+        if include_evidence:
+
+            row = X.iloc[index]
+
+            # Try model feature importance
+            if hasattr(
+                model,
+                "feature_importances_"
+            ):
+
+                importance_values = np.asarray(
+                    model.feature_importances_
+                )
+
+                ranked_indices = np.argsort(
+                    np.abs(
+                        importance_values
+                    )
+                )[::-1]
+
+                selected = ranked_indices[
+                    :max(
+                        1,
+                        top_k
+                    )
+                ]
+
+                for feature_index in selected:
+
+                    if feature_index >= len(
+                        X.columns
+                    ):
+                        continue
+
+                    feature_name = X.columns[
+                        feature_index
+                    ]
+
+                    value = row[
+                        feature_name
+                    ]
+
+                    try:
+                        value = float(value)
+                    except (
+                        TypeError,
+                        ValueError
+                    ):
+                        pass
+
+                    supporting_features.append({
+                        "feature": feature_name,
+                        "feature_value": value,
+                        "importance": float(
+                            importance_values[
+                                feature_index
+                            ]
+                        ),
+                    })
+
+        results.append({
+            "prediction": label,
+            "model_score": probability,
+            "decision_threshold": decision_threshold,
+            "threat_class": "DDoS",
+            "severity": severity,
+            "supporting_features":
+                supporting_features,
+        })
+
+    return results
+
+
+# ============================================================
+# LOAD CONFIRMATION
+# ============================================================
+
+print(
+    f"CODEZILLA DDoS model loaded: {MODEL_PATH}"
+)
+
+print(
+    f"Model type: {type(model).__name__}"
+)
+
+
+==================== E:\CODEZILLA-SIH26145\src\threat_fusion.py ====================
+
+from __future__ import annotations
+
+from typing import Any, Dict, List
+
+
+SEVERITY_RANK = {
+    "LOW": 1,
+    "MEDIUM": 2,
+    "HIGH": 3,
+}
+
+
+def _severity_rank(severity: str) -> int:
+    return SEVERITY_RANK.get(
+        str(severity).upper(),
+        1
+    )
+
+
+def fuse_results(
+    detector_results: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    Combine detector outputs into one unified alert.
+
+    Important:
+    Individual detector scores are treated as detector-local
+    confidence/evidence scores. They are not assumed to be
+    calibrated probabilities across detector families.
+    """
+
+    if not detector_results:
+        return {
+            "prediction": "BENIGN",
+            "severity": "LOW",
+            "score": 0.0,
+            "primary_threat": None,
+            "threats": [],
+            "evidence": [],
+        }
+
+    active_threats = []
+
+    for result in detector_results:
+
+        prediction = str(
+            result.get(
+                "prediction",
+                "BENIGN"
+            )
+        ).upper()
+
+        if prediction == "BENIGN":
+            continue
+
+        score = float(
+            result.get(
+                "model_score",
+                0.0
+            )
+        )
+
+        threat_class = str(
+            result.get(
+                "threat_class",
+                "UNKNOWN"
+            )
+        )
+
+        severity = str(
+            result.get(
+                "severity",
+                "LOW"
+            )
+        ).upper()
+
+        active_threats.append({
+            "threat_class": threat_class,
+            "prediction": prediction,
+            "score": round(score, 4),
+            "severity": severity,
+            "supporting_features": result.get(
+                "supporting_features",
+                []
+            ),
+        })
+
+    # No detector fired.
+    if not active_threats:
+        return {
+            "prediction": "BENIGN",
+            "severity": "LOW",
+            "score": 0.0,
+            "primary_threat": None,
+            "threats": [],
+            "evidence": [],
+        }
+
+    # --------------------------------------------------------
+    # Choose primary threat
+    # --------------------------------------------------------
+    #
+    # Prefer:
+    #   1. Severity
+    #   2. Detector-local score
+    #
+    # We intentionally do NOT claim scores are comparable
+    # calibrated probabilities.
+    # --------------------------------------------------------
+
+    active_threats.sort(
+        key=lambda item: (
+            _severity_rank(
+                item["severity"]
+            ),
+            item["score"]
+        ),
+        reverse=True
+    )
+
+    primary = active_threats[0]
+
+    # --------------------------------------------------------
+    # Final severity
+    # --------------------------------------------------------
+
+    final_severity = max(
+        (
+            item["severity"]
+            for item in active_threats
+        ),
+        key=_severity_rank
+    )
+
+    # --------------------------------------------------------
+    # Evidence strength
+    # --------------------------------------------------------
+
+    # Start with the strongest local detector score.
+    strongest_score = max(
+        item["score"]
+        for item in active_threats
+    )
+
+    # Independent detector agreement increases confidence.
+    detector_count = len(
+        active_threats
+    )
+
+    agreement_bonus = min(
+        0.10,
+        max(0, detector_count - 1) * 0.05
+    )
+
+    final_score = min(
+        1.0,
+        strongest_score + agreement_bonus
+    )
+
+    # --------------------------------------------------------
+    # Collect evidence
+    # --------------------------------------------------------
+
+    evidence = []
+
+    for threat in active_threats:
+
+        for item in threat[
+            "supporting_features"
+        ]:
+
+            evidence.append({
+                "threat_class": (
+                    threat["threat_class"]
+                ),
+                **item,
+            })
+
+    return {
+        "prediction": "THREAT",
+        "severity": final_severity,
+        "score": round(
+            final_score,
+            4
+        ),
+        "primary_threat": (
+            primary["threat_class"]
+        ),
+        "threats": active_threats,
+        "evidence": evidence[:15],
+    }
+
+
+==================== E:\CODEZILLA-SIH26145\src\detectors\c2_detector.py ====================
+
+"""
+CODEZILLA C2 ML detector.
+
+Passive / read-only detector.
+
+Uses the trained CODEZILLA C2 HistGradientBoosting model.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Dict, List
+
+import json
+import math
+
+import joblib
+import pandas as pd
+
+
+THREAT_CLASS = "C2"
+
+# ------------------------------------------------------------
+# Project paths
+# ------------------------------------------------------------
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+MODEL_PATH = (
+    PROJECT_ROOT
+    / "models"
+    / "c2_hgb.joblib"
+)
+
+SCHEMA_PATH = (
+    PROJECT_ROOT
+    / "models"
+    / "c2_feature_schema.json"
+)
+
+
+# ------------------------------------------------------------
+# Load model + schema once
+# ------------------------------------------------------------
+
+if not MODEL_PATH.exists():
+    raise FileNotFoundError(
+        f"C2 model not found: {MODEL_PATH}"
+    )
+
+if not SCHEMA_PATH.exists():
+    raise FileNotFoundError(
+        f"C2 feature schema not found: {SCHEMA_PATH}"
+    )
+
+
+MODEL = joblib.load(MODEL_PATH)
+
+with open(
+    SCHEMA_PATH,
+    "r",
+    encoding="utf-8"
+) as f:
+    SCHEMA = json.load(f)
+
+
+FEATURES: List[str] = SCHEMA["features"]
+
+DECISION_THRESHOLD = float(
+    SCHEMA["decision_threshold"]
+)
+
+
+# ------------------------------------------------------------
+# Basic validation
+# ------------------------------------------------------------
+
+if len(FEATURES) != 62:
+    raise ValueError(
+        f"Expected 62 C2 features, "
+        f"found {len(FEATURES)}."
+    )
+
+
+def _safe_float(
+    value: Any,
+    default: float = 0.0
+) -> float:
+    """Convert value to finite float."""
+    try:
+        value = float(value)
+
+        if math.isfinite(value):
+            return value
+
+    except (TypeError, ValueError):
+        pass
+
+    return default
+
+
+def _severity(
+    score: float
+) -> str:
+
+    if score >= 0.75:
+        return "HIGH"
+
+    if score >= DECISION_THRESHOLD:
+        return "MEDIUM"
+
+    return "LOW"
+
+
+def _build_evidence(
+    row: pd.Series
+) -> List[Dict[str, Any]]:
+    """
+    Return behavioral feature evidence.
+
+    These are the strongest C2 features identified during
+    model analysis. They are evidence signals, not SHAP values.
+    """
+
+    important_features = [
+        "mean_bytes",
+        "total_bytes",
+        "mean_packets",
+        "mean_duration",
+        "max_pair_seen",
+    ]
+
+    evidence = []
+
+    for feature in important_features:
+
+        if feature not in row.index:
+            continue
+
+        value = _safe_float(
+            row.get(feature)
+        )
+
+        evidence.append({
+            "feature": feature,
+            "feature_value": value,
+            "evidence_type": "behavioral_feature"
+        })
+
+    return evidence[:5]
+
+
+def _predict_row(
+    row: pd.Series
+) -> Dict[str, Any]:
+    """Run the trained C2 model on one row."""
+
+    missing = [
+        feature
+        for feature in FEATURES
+        if feature not in row.index
+    ]
+
+    if missing:
+        raise ValueError(
+            "C2 ML input is missing required features: "
+            + ", ".join(missing[:10])
+            + (
+                "..."
+                if len(missing) > 10
+                else ""
+            )
+        )
+
+    X = pd.DataFrame(
+        [[
+            _safe_float(row[feature])
+            for feature in FEATURES
+        ]],
+        columns=FEATURES
+    )
+
+    probability = float(
+        MODEL.predict_proba(X)[0, 1]
+    )
+
+    prediction = (
+        "C2"
+        if probability >= DECISION_THRESHOLD
+        else "BENIGN"
+    )
+
+    severity = _severity(
+        probability
+    )
+
+    return {
+        "prediction": prediction,
+        "model_score": round(
+            probability,
+            4
+        ),
+        "decision_threshold": DECISION_THRESHOLD,
+        "threat_class": THREAT_CLASS,
+        "severity": severity,
+        "supporting_features": _build_evidence(row)
+    }
+
+
+def detect(
+    feature_dataframe: pd.DataFrame,
+    top_k: int = 5
+) -> List[Dict[str, Any]]:
+    """
+    Run the trained C2 ML detector.
+
+    Parameters
+    ----------
+    feature_dataframe:
+        DataFrame containing all 62 trained C2 features.
+
+    top_k:
+        Maximum number of evidence features returned.
+    """
+
+    if not isinstance(
+        feature_dataframe,
+        pd.DataFrame
+    ):
+        raise TypeError(
+            "feature_dataframe must be a pandas DataFrame"
+        )
+
+    if feature_dataframe.empty:
+        return []
+
+    results = []
+
+    for _, row in feature_dataframe.iterrows():
+
+        result = _predict_row(row)
+
+        result["supporting_features"] = (
+            result["supporting_features"][:top_k]
+        )
+
+        results.append(result)
+
+    return results
+
+
+==================== E:\CODEZILLA-SIH26145\src\detectors\dns_detector.py ====================
+
+"""
+CODEZILLA DNS DETECTOR
+
+Production DNS detector using the validated HistGradientBoosting model.
+
+Passive / read-only:
+- No DNS queries are sent.
+- No endpoint probing.
+- No mitigation actions.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Dict, List
+import math
+
+import joblib
+import pandas as pd
+
+
+# ============================================================
+# CONSTANTS
+# ============================================================
+
+THREAT_CLASS = "DNS"
+
+# Project root:
+# CODEZILLA-SIH26145/
+#     src/
+#         detectors/
+#             dns_detector.py
+ROOT_DIR = Path(__file__).resolve().parents[2]
+
+MODEL_PATH = (
+    ROOT_DIR
+    / "models"
+    / "dns_hgb.joblib"
+)
+
+
+# ============================================================
+# LOAD TRAINED DNS MODEL
+# ============================================================
+
+if not MODEL_PATH.exists():
+    raise FileNotFoundError(
+        f"DNS model file not found:\n{MODEL_PATH}"
+    )
+
+MODEL_BUNDLE = joblib.load(MODEL_PATH)
+
+MODEL = MODEL_BUNDLE["model"]
+
+THRESHOLD = float(
+    MODEL_BUNDLE["threshold"]
+)
+
+FEATURES = list(
+    MODEL_BUNDLE["features"]
+)
+
+
+# ============================================================
+# HELPER
+# ============================================================
+
+def _safe_float(
+    value: Any,
+    default: float = 0.0
+) -> float:
+    """Safely convert a value to a finite float."""
+
+    try:
+        value = float(value)
+
+        if math.isfinite(value):
+            return value
+
+    except (TypeError, ValueError):
+        pass
+
+    return default
+
+
+# ============================================================
+# MAIN DETECTOR
+# ============================================================
+
+def detect(
+    feature_dataframe: pd.DataFrame,
+    top_k: int = 5
+) -> List[Dict[str, Any]]:
+    """
+    Run the trained DNS detector.
+
+    Parameters
+    ----------
+    feature_dataframe:
+        DataFrame containing the exact 14 DNS features used
+        during model training.
+
+    top_k:
+        Number of supporting features returned.
+
+    Returns
+    -------
+    list[dict]
+        Structured DNS detection results.
+    """
+
+    # --------------------------------------------------------
+    # Input validation
+    # --------------------------------------------------------
+
+    if not isinstance(
+        feature_dataframe,
+        pd.DataFrame
+    ):
+        raise TypeError(
+            "feature_dataframe must be a pandas DataFrame"
+        )
+
+    if feature_dataframe.empty:
+        return []
+
+    # --------------------------------------------------------
+    # Check required features
+    # --------------------------------------------------------
+
+    missing_features = [
+        feature
+        for feature in FEATURES
+        if feature not in feature_dataframe.columns
+    ]
+
+    if missing_features:
+
+        raise ValueError(
+            "Missing DNS features:\n"
+            + "\n".join(
+                f"- {feature}"
+                for feature in missing_features
+            )
+        )
+
+    # --------------------------------------------------------
+    # Prepare model input
+    # --------------------------------------------------------
+
+    X = (
+        feature_dataframe[FEATURES]
+        .copy()
+        .replace(
+            [float("inf"), -float("inf")],
+            float("nan")
+        )
+        .fillna(0.0)
+    )
+
+    # --------------------------------------------------------
+    # Predict probabilities
+    # --------------------------------------------------------
+
+    probabilities = (
+        MODEL
+        .predict_proba(X)[:, 1]
+    )
+
+    results = []
+
+    # --------------------------------------------------------
+    # Build structured results
+    # --------------------------------------------------------
+
+    for row_number, probability in enumerate(
+        probabilities
+    ):
+
+        probability = _safe_float(
+            probability
+        )
+
+        # Threshold selected on validation data
+        is_dns_threat = (
+            probability >= THRESHOLD
+        )
+
+        if is_dns_threat:
+
+            prediction = "DNS_THREAT"
+
+            if probability >= 0.95:
+                severity = "HIGH"
+            else:
+                severity = "MEDIUM"
+
+        else:
+
+            prediction = "BENIGN"
+            severity = "LOW"
+
+        # ----------------------------------------------------
+        # Evidence
+        # ----------------------------------------------------
+
+        row = X.iloc[row_number]
+
+        supporting_features = []
+
+        for feature in FEATURES:
+
+            supporting_features.append({
+                "feature": feature,
+                "feature_value": _safe_float(
+                    row[feature]
+                )
+            })
+
+        # Show strongest numerical feature values first.
+        supporting_features.sort(
+            key=lambda item:
+            abs(item["feature_value"]),
+            reverse=True
+        )
+
+        results.append({
+
+            "prediction": prediction,
+
+            "model_score": round(
+                probability,
+                4
+            ),
+
+            "decision_threshold": THRESHOLD,
+
+            "threat_class": THREAT_CLASS,
+
+            "severity": severity,
+
+            "supporting_features": (
+                supporting_features[:top_k]
+            )
+        })
+
+    return results
+
+
+==================== E:\CODEZILLA-SIH26145\src\detectors\dos_detector.py ====================
+
+"""
+CODEZILLA DDoS detector.
+
+Wraps the packaged temporal HGB model and exposes
+a simple detector interface for the team.
+"""
+
+from pathlib import Path
+import sys
+
+# Allow importing the shared predictor module
+ROOT_DIR = Path(__file__).resolve().parents[2]
+
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from src.ml_predictor import predict
+
+
+THREAT_CLASS = "DDoS"
+
+
+def detect(
+    feature_dataframe,
+    top_k: int = 5
+) -> list[dict]:
+    """
+    Run the DDoS detector.
+
+    Parameters
+    ----------
+    feature_dataframe:
+        DataFrame containing exactly the 62 temporal
+        model features expected by the packaged model.
+
+    top_k:
+        Number of SHAP evidence features to return.
+
+    Returns
+    -------
+    list[dict]
+        Structured DDoS predictions.
+    """
+
+    results = predict(
+        feature_dataframe,
+        include_evidence=True,
+        top_k=top_k
+    )
+
+    for result in results:
+        result["threat_class"] = THREAT_CLASS
+
+    return results
+
+
+==================== E:\CODEZILLA-SIH26145\src\detectors\encrypted_detector.py ====================
+
+"""
+CODEZILLA ENCRYPTED TRAFFIC DETECTOR
+
+Production detector using the validated encrypted-traffic
+HistGradientBoosting model.
+
+Passive / read-only:
+- does not contact remote hosts
+- does not decrypt traffic
+- does not modify network state
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Dict, List
+import math
+
+import joblib
+import pandas as pd
+
+
+# ============================================================
+# CONSTANTS
+# ============================================================
+
+THREAT_CLASS = "ENCRYPTED_TRAFFIC"
+
+ROOT_DIR = Path(
+    __file__
+).resolve().parents[2]
+
+MODEL_PATH = (
+    ROOT_DIR
+    / "models"
+    / "encrypted_hgb.joblib"
+)
+
+
+# ============================================================
+# LOAD MODEL
+# ============================================================
+
+if not MODEL_PATH.exists():
+    raise FileNotFoundError(
+        f"Encrypted model not found:\n{MODEL_PATH}"
+    )
+
+MODEL_BUNDLE = joblib.load(
+    MODEL_PATH
+)
+
+MODEL = MODEL_BUNDLE["model"]
+
+THRESHOLD = float(
+    MODEL_BUNDLE["threshold"]
+)
+
+FEATURES = list(
+    MODEL_BUNDLE["features"]
+)
+
+
+# ============================================================
+# HELPER
+# ============================================================
+
+def _safe_float(
+    value: Any,
+    default: float = 0.0
+) -> float:
+
+    try:
+        value = float(value)
+
+        if math.isfinite(value):
+            return value
+
+    except (TypeError, ValueError):
+        pass
+
+    return default
+
+
+# ============================================================
+# DETECTOR
+# ============================================================
+
+def detect(
+    feature_dataframe: pd.DataFrame,
+    top_k: int = 5
+) -> List[Dict[str, Any]]:
+    """
+    Detect suspicious encrypted-traffic behaviour.
+
+    feature_dataframe must contain the exact features used
+    during model training.
+    """
+
+    if not isinstance(
+        feature_dataframe,
+        pd.DataFrame
+    ):
+        raise TypeError(
+            "feature_dataframe must be a pandas DataFrame"
+        )
+
+    if feature_dataframe.empty:
+        return []
+
+    # --------------------------------------------------------
+    # Check schema
+    # --------------------------------------------------------
+
+    missing = [
+        feature
+        for feature in FEATURES
+        if feature not in feature_dataframe.columns
+    ]
+
+    if missing:
+        raise ValueError(
+            "Missing encrypted features:\n"
+            + "\n".join(
+                f"- {feature}"
+                for feature in missing
+            )
+        )
+
+    # --------------------------------------------------------
+    # Prepare input
+    # --------------------------------------------------------
+
+    X = (
+        feature_dataframe[FEATURES]
+        .copy()
+        .replace(
+            [float("inf"), -float("inf")],
+            float("nan")
+        )
+        .fillna(0.0)
+    )
+
+    # --------------------------------------------------------
+    # Model prediction
+    # --------------------------------------------------------
+
+    probabilities = (
+        MODEL
+        .predict_proba(X)[:, 1]
+    )
+
+    results = []
+
+    # --------------------------------------------------------
+    # Build structured results
+    # --------------------------------------------------------
+
+    for row_number, probability in enumerate(
+        probabilities
+    ):
+
+        probability = _safe_float(
+            probability
+        )
+
+        is_threat = (
+            probability >= THRESHOLD
+        )
+
+        if is_threat:
+
+            prediction = "ENCRYPTED_THREAT"
+
+            if probability >= 0.95:
+                severity = "HIGH"
+            else:
+                severity = "MEDIUM"
+
+        else:
+
+            prediction = "BENIGN"
+            severity = "LOW"
+
+        row = X.iloc[row_number]
+
+        supporting_features = []
+
+        for feature in FEATURES:
+
+            supporting_features.append({
+                "feature": feature,
+                "feature_value": _safe_float(
+                    row[feature]
+                )
+            })
+
+        # Strongest numerical values first.
+        supporting_features.sort(
+            key=lambda item:
+            abs(item["feature_value"]),
+            reverse=True
+        )
+
+        results.append({
+            "prediction": prediction,
+            "model_score": round(
+                probability,
+                4
+            ),
+            "decision_threshold": THRESHOLD,
+            "threat_class": THREAT_CLASS,
+            "severity": severity,
+            "supporting_features": (
+                supporting_features[:top_k]
+            ),
+        })
+
+    return results
+
+
+==================== E:\CODEZILLA-SIH26145\src\detectors\exfil_detector.py ====================
+
+
+
+==================== E:\CODEZILLA-SIH26145\src\detectors\recon_detector.py ====================
+
+
+
+==================== E:\CODEZILLA-SIH26145\src\detectors\__init__.py ====================
+
+"""
+CODEZILLA threat detectors.
+
+Each detector should eventually expose the same
+prediction interface so the streaming pipeline
+can call different threat models consistently.
+"""
+
+
+==================== E:\CODEZILLA-SIH26145\scripts\apply_final_demo_fix.py ====================
+
+from __future__ import annotations
+
+from pathlib import Path
+import re
+import shutil
+from datetime import datetime
+
+
+ROOT = Path(__file__).resolve().parents[1]
+MAIN = ROOT / "app" / "main.py"
+BACKUP_DIR = ROOT / "backup_final_fix"
+CSV_PATH = ROOT / "evaluation" / "packaging" / "verified_attack_input.csv"
+SCHEMA_PATH = ROOT / "models" / "dos_feature_schema.json"
+
+START_MARKER = "# DDOS VERIFIED DEMO"
+END_MARKER = "# RUN ALL DEMO SCENARIOS"
+
+NEW_BLOCK = r'''# ============================================================
+# DDOS VERIFIED DEMO
+#
+# Final judge-safe implementation:
+# - Uses the packaged, verified 62-feature CSV input.
+# - Does NOT require pandas parquet/pyarrow for the dashboard demo.
+# - Sends the sample through the same production DDoS ML pipeline.
+# - Preserves all other routes, including live monitoring.
+# ============================================================
+
+@app.post(
+    "/demo/ddos"
+)
+def run_ddos_demo():
+
+    csv_path = (
+        PROJECT_ROOT
+        / "evaluation"
+        / "packaging"
+        / "verified_attack_input.csv"
+    )
+
+    schema_path = (
+        PROJECT_ROOT
+        / "models"
+        / "dos_feature_schema.json"
+    )
+
+    if not csv_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Verified DDoS demo input not found: "
+                + str(csv_path)
+            ),
+        )
+
+    if not schema_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "DDoS feature schema not found: "
+                + str(schema_path)
+            ),
+        )
+
+    try:
+        ddos_data = pd.read_csv(csv_path)
+
+        with open(
+            schema_path,
+            "r",
+            encoding="utf-8",
+        ) as f:
+            dos_schema = json.load(f)
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Failed to load verified DDoS demo input: "
+                + str(exc)
+            ),
+        ) from exc
+
+    if ddos_data.empty:
+        raise HTTPException(
+            status_code=500,
+            detail="Verified DDoS demo input is empty.",
+        )
+
+    required_features = dos_schema.get("features", [])
+
+    if len(required_features) != 62:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Expected exactly 62 DDoS features, found "
+                f"{len(required_features)}."
+            ),
+        )
+
+    missing_features = [
+        feature
+        for feature in required_features
+        if feature not in ddos_data.columns
+    ]
+
+    if missing_features:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "DDoS feature mismatch",
+                "missing_features": missing_features,
+            },
+        )
+
+    selected = ddos_data.iloc[0]
+    ddos_payload: Dict[str, float] = {}
+
+    for feature in required_features:
+        value = selected[feature]
+
+        try:
+            ddos_payload[feature] = float(value)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    f"Invalid DDoS value for '{feature}': {value}"
+                ),
+            )
+
+    try:
+        request = DetectionRequest(
+            source="VERIFIED-DDOS-SAMPLE",
+            time_window="VERIFIED-BENCHMARK-WINDOW",
+            ddos_features=ddos_payload,
+        )
+
+        result = analyze_request(request)
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "DDoS detection failed: "
+                + str(exc)
+            ),
+        ) from exc
+
+    store_alert(result)
+
+    result["demo_source"] = "verified_ddos_csv"
+    result["demo_input"] = str(csv_path.relative_to(PROJECT_ROOT))
+
+    if "score" in result:
+        try:
+            result["verified_model_score"] = float(result["score"])
+        except (TypeError, ValueError):
+            pass
+
+    return result
+
+
+# ============================================================
+# RUN ALL DEMO SCENARIOS
+#
+# IMPORTANT:
+# This route MUST appear before /demo/{scenario}.
+# ============================================================
+'''
+
+
+def main() -> int:
+    if not MAIN.exists():
+        print(f"ERROR: Could not find {MAIN}")
+        return 1
+
+    if not CSV_PATH.exists():
+        print(f"ERROR: Missing verified DDoS CSV: {CSV_PATH}")
+        return 1
+
+    if not SCHEMA_PATH.exists():
+        print(f"ERROR: Missing DDoS schema: {SCHEMA_PATH}")
+        return 1
+
+    text = MAIN.read_text(encoding="utf-8")
+    if START_MARKER not in text or END_MARKER not in text:
+        print("ERROR: Could not find the DDoS demo section markers in app/main.py")
+        print("No file was changed.")
+        return 1
+
+    start = text.index(START_MARKER)
+    end = text.index(END_MARKER, start)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    backup = BACKUP_DIR / f"main.py.before_final_ddos_fix_{timestamp}.bak"
+    shutil.copy2(MAIN, backup)
+
+    new_text = text[:start] + NEW_BLOCK + text[end + len(END_MARKER):]
+    MAIN.write_text(new_text, encoding="utf-8")
+
+    print("CODEZILLA final DDoS demo fix applied.")
+    print(f"Updated: {MAIN}")
+    print(f"Backup : {backup}")
+    print("The fix removes the runtime parquet/pyarrow dependency from /demo/ddos.")
+    print("Live-monitoring and all other routes are preserved.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+
+==================== E:\CODEZILLA-SIH26145\scripts\download_2025_uwf.py ====================
+
+#!/usr/bin/env python
+"""Download CSV shards from the official UWF Summer-2025 Zeek datasets.
+
+Default downloads the compact CSV trees for UWF-ZeekDataSum25-1, keeping the
+project portable. Use --dataset 2 or --dataset both for Sum25-2/both.
+"""
+from __future__ import annotations
+import argparse
+import re
+import urllib.request
+from html.parser import HTMLParser
+from pathlib import Path
+
+BASE = "https://datasets.uwf.edu/data/UWF-ZeekDataSum25-{}/csv/"
+FOLDERS = ["Benign", "Defense_Evasion", "Discovery", "Initial_Access", "Lateral_Movement", "Privilege_Escalation", "Reconnaissance"]
+
+class HrefParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.hrefs = []
+    def handle_starttag(self, tag, attrs):
+        if tag == "a":
+            for k, v in attrs:
+                if k == "href" and v:
+                    self.hrefs.append(v)
+
+def get_files(url: str) -> list[str]:
+    req = urllib.request.Request(url, headers={"User-Agent": "CODEZILLA-2025-validator/1.0"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        html = r.read().decode("utf-8", errors="ignore")
+    p = HrefParser(); p.feed(html)
+    return sorted({x for x in p.hrefs if re.search(r"part-.*\.csv$", x)})
+
+def download(url: str, dest: Path):
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    req = urllib.request.Request(url, headers={"User-Agent": "CODEZILLA-2025-validator/1.0"})
+    with urllib.request.urlopen(req, timeout=120) as r, dest.open("wb") as f:
+        f.write(r.read())
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dataset", choices=["1", "2", "both"], default="1")
+    ap.add_argument("--output", default="data/modern_2025")
+    ap.add_argument("--folders", default=",".join(FOLDERS), help="Comma-separated folders to fetch")
+    args = ap.parse_args()
+    datasets = [1, 2] if args.dataset == "both" else [int(args.dataset)]
+    folders = [x.strip() for x in args.folders.split(",") if x.strip()]
+    out = Path(args.output)
+    for ds in datasets:
+        for folder in folders:
+            url = BASE.format(ds) + folder + "/"
+            try:
+                names = get_files(url)
+            except Exception as exc:
+                print(f"WARN: cannot inspect {url}: {exc}")
+                continue
+            for name in names:
+                target = out / f"UWF-ZeekDataSum25-{ds}" / folder / Path(name).name
+                if target.exists():
+                    print("skip", target)
+                    continue
+                full = url + name
+                print("download", full)
+                try:
+                    download(full, target)
+                except Exception as exc:
+                    print(f"WARN: failed {full}: {exc}")
+    print(f"Done. Dataset root: {out.resolve()}")
+
+if __name__ == "__main__":
+    main()
+
+
+==================== E:\CODEZILLA-SIH26145\scripts\generate_2025_report.py ====================
+
+from __future__ import annotations
+import json
+from pathlib import Path
+
+def pct(x):
+    return f"{100*float(x):.2f}%"
+
+def main():
+    root = Path(__file__).resolve().parents[1]
+    metrics_path = root / "evaluation" / "modern_2025" / "output" / "uwf_2025_metrics.json"
+    if not metrics_path.exists():
+        raise SystemExit(f"Metrics file not found: {metrics_path}")
+    data = json.loads(metrics_path.read_text(encoding="utf-8"))
+    m = data.get("metrics", {})
+    ev = data.get("evaluation", {})
+    cm = m.get("confusion_matrix", [])
+    rows = data.get("rows_used", 0)
+    report = (
+        "# CODEZILLA â€” Modern 2025 Dataset Validation Report\n\n"
+        f"## Dataset\n**{data.get('dataset','UWF-ZeekDataSum2025-1')}**\n\n"
+        f"## Evaluation method\n**{ev.get('evaluation_method','grouped_out_of_group_cross_validation')}**\n\n"
+        f"Rows used: **{rows:,}**\n\n"
+        "The strict evaluation holds out traffic by source/tactic group and excludes IP addresses and timestamps from model features.\n\n"
+        "## Results\n| Metric | Result |\n|---|---:|\n"
+        f"| Accuracy | **{pct(m.get('accuracy',0))}** |\n"
+        f"| Precision | **{pct(m.get('precision',0))}** |\n"
+        f"| Recall | **{pct(m.get('recall',0))}** |\n"
+        f"| F1 | **{pct(m.get('f1',0))}** |\n"
+        f"| ROC-AUC | **{pct(m.get('roc_auc',0))}** |\n\n"
+        "### Confusion matrix\n```text\n" + str(cm) + "\n```\n\n"
+        "## Production status\n**AUXILIARY VALIDATION ONLY**\n\n"
+        "Do not use the earlier random-split 1.0000 result as headline evidence.\n"
+    )
+    out = root / "evaluation" / "modern_2025" / "output" / "FINAL_2025_VALIDATION_REPORT.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(report, encoding='utf-8')
+    print(f"Saved: {out}")
+
+if __name__ == '__main__':
+    main()
+
+
+==================== E:\CODEZILLA-SIH26145\scripts\validate_2025_uwf.py ====================
+
+#!/usr/bin/env python
+"""CODEZILLA strict modern-2025 UWF Zeek validation.
+
+Default evaluation is leakage-resistant group/file holdout:
+- attack traffic is held out by tactic folder (all rows from that tactic stay in test)
+- benign traffic is partitioned into matching folds and never overlaps train/test
+- predictions from every held-out fold are aggregated into one honest OOF test set
+
+A legacy random split is still available with --mode random for comparison only.
+This is an auxiliary modern benchmark and does not replace production detectors.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+from typing import Iterable
+
+import joblib
+import numpy as np
+import pandas as pd
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import HistGradientBoostingClassifier
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OrdinalEncoder
+
+NUMERIC = [
+    "duration", "missed_bytes", "orig_bytes", "orig_ip_bytes",
+    "orig_pkts", "resp_bytes", "resp_ip_bytes", "resp_pkts",
+]
+CATEGORICAL = [
+    "conn_state", "history", "service", "proto", "local_orig", "local_resp",
+]
+LABEL_CANDIDATES = [
+    "label_tactic_binary", "label_tactic", "label", "tactic", "attack", "class",
+]
+BENIGN_NAMES = {"benign", "normal", "background"}
+
+
+def discover_files(root: Path) -> list[Path]:
+    files = sorted(list(root.rglob("*.csv")) + list(root.rglob("*.parquet")))
+    if not files and root.is_file() and root.suffix.lower() in {".csv", ".parquet"}:
+        files = [root]
+    return files
+
+
+def read_one(path: Path) -> pd.DataFrame:
+    if path.suffix.lower() == ".parquet":
+        return pd.read_parquet(path)
+    return pd.read_csv(path, low_memory=False)
+
+
+def choose_label(df: pd.DataFrame) -> str:
+    lower = {str(c).lower(): c for c in df.columns}
+    for name in LABEL_CANDIDATES:
+        if name in lower:
+            return lower[name]
+    raise ValueError("No supported label column found. Expected: " + ", ".join(LABEL_CANDIDATES))
+
+
+def binary_target(series: pd.Series) -> pd.Series:
+    numeric = pd.to_numeric(series, errors="coerce")
+    if numeric.notna().mean() > 0.95:
+        return (numeric.fillna(0) != 0).astype(int)
+    text = series.astype(str).str.strip().str.lower()
+    return (~text.isin({"benign", "normal", "background", "none", "0", "false"})).astype(int)
+
+
+def build_pipeline(num_cols: list[str], cat_cols: list[str]) -> Pipeline:
+    pre = ColumnTransformer(
+        transformers=[
+            ("num", Pipeline([("imputer", SimpleImputer(strategy="median"))]), num_cols),
+            ("cat", Pipeline([
+                ("imputer", SimpleImputer(strategy="most_frequent")),
+                ("encoder", OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)),
+            ]), cat_cols),
+        ],
+        remainder="drop",
+        verbose_feature_names_out=False,
+    )
+    model = HistGradientBoostingClassifier(
+        max_iter=300,
+        learning_rate=0.05,
+        max_leaf_nodes=31,
+        min_samples_leaf=25,
+        l2_regularization=1.0,
+        random_state=42,
+    )
+    return Pipeline([("preprocess", pre), ("model", model)])
+
+
+def metric_bundle(y_true: pd.Series, prob: np.ndarray, threshold: float = 0.50) -> dict:
+    pred = (prob >= threshold).astype(int)
+    out = {
+        "threshold": threshold,
+        "accuracy": float(accuracy_score(y_true, pred)),
+        "precision": float(precision_score(y_true, pred, zero_division=0)),
+        "recall": float(recall_score(y_true, pred, zero_division=0)),
+        "f1": float(f1_score(y_true, pred, zero_division=0)),
+        "confusion_matrix": confusion_matrix(y_true, pred).tolist(),
+        "classification_report": classification_report(y_true, pred, output_dict=True, zero_division=0),
+    }
+    out["roc_auc"] = float(roc_auc_score(y_true, prob)) if y_true.nunique() == 2 else None
+    return out
+
+
+def prepare(root: Path, max_rows: int) -> tuple[pd.DataFrame, str, list[str], list[str]]:
+    files = discover_files(root)
+    if not files:
+        raise SystemExit(f"No CSV/Parquet files found under {root}")
+
+    print(f"[1/7] Reading {len(files)} files from {root}")
+    frames: list[pd.DataFrame] = []
+    for path in files:
+        try:
+            part = read_one(path)
+            if len(part):
+                part = part.copy()
+                # First directory below dataset root is the traffic/tactic group.
+                try:
+                    rel = path.relative_to(root)
+                    group = rel.parts[0] if len(rel.parts) > 1 else path.stem
+                except ValueError:
+                    group = path.parent.name or path.stem
+                part["_source_group"] = str(group)
+                frames.append(part)
+        except Exception as exc:
+            print(f"WARN: skipped {path.name}: {exc}")
+    if not frames:
+        raise SystemExit("No readable dataset files were found.")
+
+    df = pd.concat(frames, ignore_index=True, sort=False)
+    print(f"Loaded rows: {len(df):,}; columns: {len(df.columns)}")
+    label_col = choose_label(df)
+    df["_target"] = binary_target(df[label_col])
+
+    num_cols = [c for c in NUMERIC if c in df.columns]
+    cat_cols = [c for c in CATEGORICAL if c in df.columns]
+    if len(num_cols) + len(cat_cols) < 4:
+        raise SystemExit(f"Too few recognized behavioural features. Columns: {sorted(map(str, df.columns))}")
+
+    keep = num_cols + cat_cols + ["_target", "_source_group"]
+    work = df[keep].copy()
+    for c in num_cols:
+        work[c] = pd.to_numeric(work[c], errors="coerce")
+    for c in cat_cols:
+        work[c] = work[c].astype(str).replace({"nan": "<MISSING>"})
+    work["_source_group"] = work["_source_group"].astype(str)
+
+    if max_rows and len(work) > max_rows:
+        # Stratified cap while retaining source-group information.
+        sampled, _ = train_test_split(work, train_size=max_rows, stratify=work["_target"], random_state=42)
+        work = sampled.reset_index(drop=True)
+        print(f"Applied stratified row cap: {len(work):,}")
+
+    return work, str(label_col), num_cols, cat_cols
+
+
+def strict_group_eval(work: pd.DataFrame, num_cols: list[str], cat_cols: list[str]) -> tuple[dict, dict]:
+    groups = sorted(work["_source_group"].unique())
+    benign_group = next((g for g in groups if g.strip().lower() in BENIGN_NAMES), None)
+    attack_groups = [g for g in groups if g != benign_group and (work.loc[work["_source_group"] == g, "_target"].mean() > 0.5)]
+    if benign_group is None or not attack_groups:
+        raise SystemExit(f"Could not identify benign + attack groups. Found groups: {groups}")
+
+    benign = work[work["_source_group"] == benign_group].copy().reset_index(drop=True)
+    attack_by_group = {g: work[work["_source_group"] == g].copy() for g in attack_groups}
+    benign_parts = np.array_split(benign.index.to_numpy(), len(attack_groups))
+
+    all_truth: list[int] = []
+    all_prob: list[float] = []
+    fold_rows = []
+
+    for fold_id, attack_group in enumerate(attack_groups):
+        test_benign_idx = set(benign_parts[fold_id].tolist())
+        test_benign = benign.loc[sorted(test_benign_idx)].copy()
+        test_attack = attack_by_group[attack_group].copy()
+        test = pd.concat([test_benign, test_attack], ignore_index=True)
+
+        train_benign = benign.drop(index=sorted(test_benign_idx))
+        train_attack = work[~work["_source_group"].isin([benign_group, attack_group])]
+        train = pd.concat([train_benign, train_attack], ignore_index=True)
+
+        X_train = train[num_cols + cat_cols]
+        y_train = train["_target"]
+        X_test = test[num_cols + cat_cols]
+        y_test = test["_target"]
+
+        pipe = build_pipeline(num_cols, cat_cols)
+        pipe.fit(X_train, y_train)
+        prob = pipe.predict_proba(X_test)[:, 1]
+        all_truth.extend(y_test.astype(int).tolist())
+        all_prob.extend(prob.astype(float).tolist())
+
+        fm = metric_bundle(y_test, prob)
+        fold_rows.append({
+            "fold": fold_id + 1,
+            "held_out_attack_group": attack_group,
+            "train_rows": len(train),
+            "test_rows": len(test),
+            "test_benign_rows": len(test_benign),
+            "test_attack_rows": len(test_attack),
+            "accuracy": fm["accuracy"],
+            "precision": fm["precision"],
+            "recall": fm["recall"],
+            "f1": fm["f1"],
+            "roc_auc": fm["roc_auc"],
+        })
+        print(f"  Fold {fold_id+1}/{len(attack_groups)}: hold out {attack_group:20s} | F1={fm['f1']:.4f} Recall={fm['recall']:.4f}")
+
+    y_all = pd.Series(all_truth, name="target")
+    prob_all = np.asarray(all_prob, dtype=float)
+    overall = metric_bundle(y_all, prob_all)
+    details = {
+        "evaluation_method": "grouped_out_of_group_cross_validation",
+        "group_column": "_source_group",
+        "benign_group": benign_group,
+        "attack_groups": attack_groups,
+        "folds": fold_rows,
+        "overall": overall,
+        "test_rows_total": int(len(y_all)),
+    }
+    return overall, details
+
+
+def random_eval(work: pd.DataFrame, num_cols: list[str], cat_cols: list[str]) -> tuple[dict, dict]:
+    X = work[num_cols + cat_cols]
+    y = work["_target"]
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, stratify=y, random_state=42)
+    pipe = build_pipeline(num_cols, cat_cols)
+    pipe.fit(X_train, y_train)
+    prob = pipe.predict_proba(X_test)[:, 1]
+    m = metric_bundle(y_test, prob)
+    return m, {"evaluation_method": "random_stratified_split", "train_rows": len(X_train), "test_rows": len(X_test)}
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--data", required=True, help="CSV/Parquet file or dataset directory")
+    ap.add_argument("--dataset-name", default="UWF-ZeekDataSum2025-1")
+    ap.add_argument("--max-rows", type=int, default=0, help="Safety cap; 0 = no cap")
+    ap.add_argument("--mode", choices=["strict", "random"], default="strict")
+    ap.add_argument("--threshold", type=float, default=0.50)
+    args = ap.parse_args()
+
+    root = Path(args.data).resolve()
+    work, label_col, num_cols, cat_cols = prepare(root, args.max_rows)
+
+    print(f"[2/7] Target distribution: benign={(work['_target']==0).sum():,}, threat={(work['_target']==1).sum():,}")
+    print(f"Recognized features: numeric={len(num_cols)}, categorical={len(cat_cols)}")
+
+    if args.mode == "strict":
+        print("[3/7] Using leakage-resistant file/tactic holdout evaluation")
+        metrics, details = strict_group_eval(work, num_cols, cat_cols)
+    else:
+        print("[3/7] WARNING: using random stratified split for comparison only")
+        metrics, details = random_eval(work, num_cols, cat_cols)
+
+    # Retrain a final auxiliary benchmark model on ALL rows for artifact/demo use.
+    print("[4/7] Training final auxiliary 2025 model on all available rows")
+    final_pipe = build_pipeline(num_cols, cat_cols)
+    final_pipe.fit(work[num_cols + cat_cols], work["_target"])
+
+    out = Path(__file__).resolve().parents[1] / "evaluation" / "modern_2025" / "output"
+    out.mkdir(parents=True, exist_ok=True)
+    joblib.dump(final_pipe, out / "uwf_2025_hgb.joblib")
+
+    result = {
+        "dataset": args.dataset_name,
+        "label_column": label_col,
+        "rows_used": int(len(work)),
+        "features_numeric": num_cols,
+        "features_categorical": cat_cols,
+        "evaluation": details,
+        "metrics": metrics,
+        "warning": "Do not use random-split 1.0000 results as headline evidence; strict grouped evaluation is the defensible result.",
+        "production_status": "auxiliary_validation_only",
+    }
+    (out / "uwf_2025_metrics.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+    schema = {
+        "model_name": "CODEZILLA-UWF-2025-HGB",
+        "dataset": args.dataset_name,
+        "feature_count": len(num_cols) + len(cat_cols),
+        "numeric_features": num_cols,
+        "categorical_features": cat_cols,
+        "decision_threshold": args.threshold,
+        "task": "binary benign vs threat on modern UWF Zeek data",
+        "evaluation_method": details.get("evaluation_method"),
+        "note": "Auxiliary modern benchmark; does not replace DDoS/C2/DNS/encrypted production detectors.",
+    }
+    (out / "uwf_2025_feature_schema.json").write_text(json.dumps(schema, indent=2), encoding="utf-8")
+
+    print("[5/7] Saved artifacts:")
+    for p in sorted(out.iterdir()):
+        print(" -", p)
+
+    print("[6/7] FINAL 2025 RESULTS")
+    for key in ["accuracy", "precision", "recall", "f1", "roc_auc"]:
+        value = metrics.get(key)
+        print(f"{key.upper():9s}: {value if value is None else f'{value:.4f}'}")
+    print("CONFUSION:", metrics["confusion_matrix"])
+    print(f"TEST ROWS: {details.get('test_rows_total', details.get('test_rows'))}")
+    print(f"METHOD: {details['evaluation_method']}")
+    print("[7/7] Done")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+
+==================== E:\CODEZILLA-SIH26145\evaluation\baseline\baseline_results.json ====================
+
+{
+    "model": "Logistic Regression",
+    "dataset": "CIC-IDS-2018 Wednesday 21-02-2018",
+    "task": "Binary DDoS detection",
+    "features": 68,
+    "test_accuracy": 1.0,
+    "test_precision": 1.0,
+    "test_recall": 1.0,
+    "test_f1": 1.0,
+    "test_false_positive_rate": 0.0,
+    "test_inference_seconds": 0.018831600027624518
+}
+
+
+==================== E:\CODEZILLA-SIH26145\evaluation\modern_2025\FINAL_VALIDATION_REPORT.md ====================
+
+# CODEZILLA â€” Modern 2025 Dataset Validation Report
+
+## Purpose
+This report documents the independent modern-data validation layer for CODEZILLA. The 2025 benchmark is **not** being substituted for the existing production training datasets.
+
+## Dataset
+**UWF-ZeekDataSum25-1 (University of West Florida)**
+
+## Evaluation design
+- Attack traffic is held out by tactic/source group.
+- Benign traffic is partitioned into matching folds.
+- Held-out attack and benign groups are excluded from training for each fold.
+- IP addresses and timestamps are excluded from model features.
+- The earlier random row-split result of 1.0000 is **not** used as headline evidence.
+
+## CODEZILLA result
+| Metric | Result |
+|---|---:|
+| Accuracy | **77.00%** |
+| Precision | **99.99%** |
+| Recall | **54.17%** |
+| F1 | **70.27%** |
+| ROC-AUC | **57.41%** |
+| Evaluation rows | **58,131** |
+
+### Confusion matrix
+```text
+[[28962, 2],
+ [13368, 15799]]
+```
+
+## Interpretation
+The auxiliary model shows very high precision with moderate recall on grouped 2025 traffic. The ROC-AUC of 0.5741 indicates that this model should **not** be presented as a superior replacement for the existing production detectors.
+
+## Production status
+**AUXILIARY VALIDATION ONLY**
+
+Current production detectors remain unchanged: DDoS, C2, DNS, and Encrypted traffic.
+
+## Judge-safe wording
+> CODEZILLA uses established benchmark datasets for core detector training and independently validates generalization on modern 2025 UWF Zeek traffic. Under grouped out-of-group evaluation, the auxiliary 2025 benchmark achieved 70.27% F1 with 99.99% precision.
+
+Do not claim that this result is 99.99% accuracy, or that the 2025 auxiliary model is better than every existing detector.
+
+
+==================== E:\CODEZILLA-SIH26145\evaluation\modern_2025\MODERN_2025_PLAN.md ====================
+
+# CODEZILLA modern-data plan
+
+## Selected modern source
+**UWF-ZeekDataSum2025-1** is the primary modern benchmark because it contains benign traffic plus multiple MITRE ATT&CK tactics. **UWF-ZeekDataSum2025-2** can be used as an additional holdout after the first run.
+
+## What is trained here
+A separate, compact `HistGradientBoostingClassifier` uses portable Zeek behavioural metadata. IP addresses and timestamps are deliberately excluded from the model to avoid identity/time leakage and to keep the detector portable.
+
+## What is NOT changed
+The current production models for DDoS, C2, DNS and encrypted traffic remain untouched. The 2025 model is an auxiliary modern benchmark until its metrics are inspected.
+
+## Required final evidence
+Do not report literature numbers as CODEZILLA numbers. After downloading the data and running the validator, report:
+- accuracy
+- precision
+- recall
+- F1
+- ROC-AUC
+- confusion matrix
+- number of rows used
+- exact feature list
+
+A model is promoted into production only when its test behaviour is demonstrably useful and its feature contract can be mapped to the live pipeline without leakage.
+
+
+==================== E:\CODEZILLA-SIH26145\evaluation\modern_2025\README.md ====================
+
+# CODEZILLA â€” Modern 2025 Validation Layer
+
+## Dataset selected
+UWF-ZeekDataSum2025-1 and UWF-ZeekDataSum2025-2, University of West Florida.
+
+These are modern Zeek Conn datasets released through the UWF dataset portal and used in 2025/2026 research on MITRE ATT&CK-labeled network traffic. Sum25-1 contains Benign, Reconnaissance, Discovery, Initial Access, Lateral Movement, Privilege Escalation, and Defense Evasion; Sum25-2 contains Benign, Reconnaissance, and Discovery.
+
+Official data portal:
+https://datasets.uwf.edu/data/
+
+Official folders:
+https://datasets.uwf.edu/data/UWF-ZeekDataSum25-1/csv/
+https://datasets.uwf.edu/data/UWF-ZeekDataSum25-2/csv/
+
+## Why this is being added
+This layer does NOT replace the existing CIC-IDS-2018 / CTU-13 production models. It gives CODEZILLA a modern-data benchmark and an independently trained modern model for comparison.
+
+That produces a stronger competition story:
+
+1. Existing production detectors remain reproducible on the established benchmarks.
+2. Modern 2025 Zeek data is evaluated separately.
+3. The comparison is reported without mixing incompatible feature schemas.
+
+## Expected raw structure
+The UWF Zeek datasets use a 17-feature Conn representation. Important fields include:
+`community_id`, `conn_state`, `duration`, `history`, `src_ip_zeek`, `src_port_zeek`, `dest_ip_zeek`, `dest_port_zeek`, `local_orig`, `local_resp`, `missed_bytes`, `orig_bytes`, `orig_ip_bytes`, `orig_pkts`, `resp_bytes`, `resp_ip_bytes`, `resp_pkts`, `service`, and `ts`.
+
+The validation script only uses network-behaviour features and excludes IP addresses and timestamps from model features to reduce leakage and improve portability.
+
+
+==================== E:\CODEZILLA-SIH26145\evaluation\modern_2025\README_EVIDENCE_PATCH.md ====================
+
+# CODEZILLA 2025 Evidence Patch
+
+Copy these files into the existing project without deleting existing folders.
+
+Run after copying:
+
+```powershell
+python scripts\generate_2025_report.py
+```
+
+The generator reads `evaluation\modern_2025\output\uwf_2025_metrics.json` and writes `evaluation\modern_2025\output\FINAL_2025_VALIDATION_REPORT.md`.
+
+
+==================== E:\CODEZILLA-SIH26145\evaluation\modern_2025\SOURCES.md ====================
+
+# Modern dataset sources
+
+1. University of West Florida UWF Network Traffic Flow Datasets
+   https://datasets.uwf.edu/data/
+
+2. UWF-ZeekDataSum25-1 CSV root
+   https://datasets.uwf.edu/data/UWF-ZeekDataSum25-1/csv/
+
+3. UWF-ZeekDataSum25-2 CSV root
+   https://datasets.uwf.edu/data/UWF-ZeekDataSum25-2/csv/
+
+4. 2025 research paper using UWF-ZeekDataSum2025-1 and UWF-ZeekDataSum2025-2
+   Feature Selection for Improving ANN and CNN Models for Attack Detection in Zeek Network Data.
+
+Important: the published research metrics are literature results, not CODEZILLA results. CODEZILLA metrics must be generated by running scripts/validate_2025_uwf.py on the downloaded data.
+
+
+==================== E:\CODEZILLA-SIH26145\evaluation\modern_2025\STRICT_VALIDATION.md ====================
+
+# Strict 2025 validation
+
+The first validator used a random stratified row split. The resulting 1.0000 scores are not suitable as headline evidence because rows from the same traffic grouping can land in both train and test.
+
+The current validator defaults to a leakage-resistant grouped evaluation:
+
+- attack traffic is held out by tactic folder/group;
+- benign traffic is divided into matching folds;
+- the held-out attack group and held-out benign fold are never used for training that fold;
+- all held-out predictions are aggregated into one out-of-group test result.
+
+Use:
+
+```powershell
+python scripts\validate_2025_uwf.py --data data\modern_2025\UWF-ZeekDataSum25-1
+```
+
+The `--mode random` option exists only to reproduce the old comparison split:
+
+```powershell
+python scripts\validate_2025_uwf.py --data data\modern_2025\UWF-ZeekDataSum25-1 --mode random
+```
+
+For SIH evidence, use the **strict** results, not the random-split 1.0000 result.
+
+
+==================== E:\CODEZILLA-SIH26145\evaluation\modern_2025\output\FINAL_2025_VALIDATION_REPORT.md ====================
+
+# CODEZILLA â€” Modern 2025 Dataset Validation Report
+
+## Dataset
+**UWF-ZeekDataSum2025-1**
+
+## Evaluation method
+**grouped_out_of_group_cross_validation**
+
+Rows used: **58,131**
+
+The strict evaluation holds out traffic by source/tactic group and excludes IP addresses and timestamps from model features.
+
+## Results
+| Metric | Result |
+|---|---:|
+| Accuracy | **77.00%** |
+| Precision | **99.99%** |
+| Recall | **54.17%** |
+| F1 | **70.27%** |
+| ROC-AUC | **57.41%** |
+
+### Confusion matrix
+```text
+[[28962, 2], [13368, 15799]]
+```
+
+## Production status
+**AUXILIARY VALIDATION ONLY**
+
+Do not use the earlier random-split 1.0000 result as headline evidence.
+
+
+==================== E:\CODEZILLA-SIH26145\evaluation\modern_2025\output\uwf_2025_feature_schema.json ====================
+
+{
+  "model_name": "CODEZILLA-UWF-2025-HGB",
+  "dataset": "UWF-ZeekDataSum2025-1",
+  "feature_count": 14,
+  "numeric_features": [
+    "duration",
+    "missed_bytes",
+    "orig_bytes",
+    "orig_ip_bytes",
+    "orig_pkts",
+    "resp_bytes",
+    "resp_ip_bytes",
+    "resp_pkts"
+  ],
+  "categorical_features": [
+    "conn_state",
+    "history",
+    "service",
+    "proto",
+    "local_orig",
+    "local_resp"
+  ],
+  "decision_threshold": 0.5,
+  "task": "binary benign vs threat on modern UWF Zeek data",
+  "evaluation_method": "grouped_out_of_group_cross_validation",
+  "note": "Auxiliary modern benchmark; does not replace DDoS/C2/DNS/encrypted production detectors."
+}
+
+
+==================== E:\CODEZILLA-SIH26145\evaluation\modern_2025\output\uwf_2025_metrics.json ====================
+
+{
+  "dataset": "UWF-ZeekDataSum2025-1",
+  "label_column": "label_tactic",
+  "rows_used": 58131,
+  "features_numeric": [
+    "duration",
+    "missed_bytes",
+    "orig_bytes",
+    "orig_ip_bytes",
+    "orig_pkts",
+    "resp_bytes",
+    "resp_ip_bytes",
+    "resp_pkts"
+  ],
+  "features_categorical": [
+    "conn_state",
+    "history",
+    "service",
+    "proto",
+    "local_orig",
+    "local_resp"
+  ],
+  "evaluation": {
+    "evaluation_method": "grouped_out_of_group_cross_validation",
+    "group_column": "_source_group",
+    "benign_group": "Benign",
+    "attack_groups": [
+      "Defense_Evasion",
+      "Discovery",
+      "Initial_Access",
+      "Lateral_Movement",
+      "Privilege_Escalation",
+      "Reconnaissance"
+    ],
+    "folds": [
+      {
+        "fold": 1,
+        "held_out_attack_group": "Defense_Evasion",
+        "train_rows": 53130,
+        "test_rows": 5001,
+        "test_benign_rows": 4828,
+        "test_attack_rows": 173,
+        "accuracy": 0.9998000399920016,
+        "precision": 1.0,
+        "recall": 0.9942196531791907,
+        "f1": 0.9971014492753624,
+        "roc_auc": 0.9999946123527975
+      },
+      {
+        "fold": 2,
+        "held_out_attack_group": "Discovery",
+        "train_rows": 53247,
+        "test_rows": 4884,
+        "test_benign_rows": 4828,
+        "test_attack_rows": 56,
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "roc_auc": 1.0
+      },
+      {
+        "fold": 3,
+        "held_out_attack_group": "Initial_Access",
+        "train_rows": 53303,
+        "test_rows": 4828,
+        "test_benign_rows": 4827,
+        "test_attack_rows": 1,
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "roc_auc": 1.0
+      },
+      {
+        "fold": 4,
+        "held_out_attack_group": "Lateral_Movement",
+        "train_rows": 53284,
+        "test_rows": 4847,
+        "test_benign_rows": 4827,
+        "test_attack_rows": 20,
+        "accuracy": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "roc_auc": 1.0
+      },
+      {
+        "fold": 5,
+        "held_out_attack_group": "Privilege_Escalation",
+        "train_rows": 53131,
+        "test_rows": 5000,
+        "test_benign_rows": 4827,
+        "test_attack_rows": 173,
+        "accuracy": 0.9994,
+        "precision": 0.9885057471264368,
+        "recall": 0.9942196531791907,
+        "f1": 0.9913544668587896,
+        "roc_auc": 0.9999874262188484
+      },
+      {
+        "fold": 6,
+        "held_out_attack_group": "Reconnaissance",
+        "train_rows": 24560,
+        "test_rows": 33571,
+        "test_benign_rows": 4827,
+        "test_attack_rows": 28744,
+        "accuracy": 0.6018587471329421,
+        "precision": 1.0,
+        "recall": 0.5349986084052324,
+        "f1": 0.6970672227006935,
+        "roc_auc": 0.7265235915818404
+      }
+    ],
+    "overall": {
+      "threshold": 0.5,
+      "accuracy": 0.770002236328293,
+      "precision": 0.9998734257325486,
+      "recall": 0.5416738094421778,
+      "f1": 0.7026774595267746,
+      "confusion_matrix": [
+        [
+          28962,
+          2
+        ],
+        [
+          13368,
+          15799
+        ]
+      ],
+      "classification_report": {
+        "0": {
+          "precision": 0.6841956059532247,
+          "recall": 0.9999309487639829,
+          "f1-score": 0.8124666872387578,
+          "support": 28964.0
+        },
+        "1": {
+          "precision": 0.9998734257325486,
+          "recall": 0.5416738094421778,
+          "f1-score": 0.7026774595267746,
+          "support": 29167.0
+        },
+        "accuracy": 0.770002236328293,
+        "macro avg": {
+          "precision": 0.8420345158428866,
+          "recall": 0.7708023791030804,
+          "f1-score": 0.7575720733827662,
+          "support": 58131.0
+        },
+        "weighted avg": {
+          "precision": 0.8425857070955333,
+          "recall": 0.770002236328293,
+          "f1-score": 0.7573803752077345,
+          "support": 58131.0
+        }
+      },
+      "roc_auc": 0.5741149747800699
+    },
+    "test_rows_total": 58131
+  },
+  "metrics": {
+    "threshold": 0.5,
+    "accuracy": 0.770002236328293,
+    "precision": 0.9998734257325486,
+    "recall": 0.5416738094421778,
+    "f1": 0.7026774595267746,
+    "confusion_matrix": [
+      [
+        28962,
+        2
+      ],
+      [
+        13368,
+        15799
+      ]
+    ],
+    "classification_report": {
+      "0": {
+        "precision": 0.6841956059532247,
+        "recall": 0.9999309487639829,
+        "f1-score": 0.8124666872387578,
+        "support": 28964.0
+      },
+      "1": {
+        "precision": 0.9998734257325486,
+        "recall": 0.5416738094421778,
+        "f1-score": 0.7026774595267746,
+        "support": 29167.0
+      },
+      "accuracy": 0.770002236328293,
+      "macro avg": {
+        "precision": 0.8420345158428866,
+        "recall": 0.7708023791030804,
+        "f1-score": 0.7575720733827662,
+        "support": 58131.0
+      },
+      "weighted avg": {
+        "precision": 0.8425857070955333,
+        "recall": 0.770002236328293,
+        "f1-score": 0.7573803752077345,
+        "support": 58131.0
+      }
+    },
+    "roc_auc": 0.5741149747800699
+  },
+  "warning": "Do not use random-split 1.0000 results as headline evidence; strict grouped evaluation is the defensible result.",
+  "production_status": "auxiliary_validation_only"
+}
+
+
+==================== E:\CODEZILLA-SIH26145\evaluation\temporal\final_temporal_test.json ====================
+
+{
+    "model": "HistGradientBoosting",
+    "window_size_seconds": 2,
+    "prediction_horizon_seconds": 2,
+    "feature_count": 62,
+    "threshold": 0.8,
+    "test_accuracy": 0.9075342465753424,
+    "test_precision": 0.9625,
+    "test_recall": 0.88,
+    "test_f1": 0.9194029850746268,
+    "test_fpr": 0.05128205128205128,
+    "confusion_matrix": [
+        [
+            111,
+            6
+        ],
+        [
+            21,
+            154
+        ]
+    ]
+}
