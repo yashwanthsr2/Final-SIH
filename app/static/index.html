@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -26,12 +26,12 @@ button,select{font:inherit}.header{height:70px;padding:0 30px;display:flex;align
 <main class="container">
 <section class="hero">
   <div><h1>Security Operations Center</h1><p>Passive AI threat detection, live telemetry, evidence and correlation.</p></div>
-  <div class="mode-strip"><span class="mode-badge active" id="liveBadge">● LIVE MONITOR</span><span class="mode-badge" id="replayBadge">VERIFIED REPLAY</span><span class="mode-badge">READ-ONLY</span><span class="mode-badge">NO DECRYPTION</span></div>
+  <div class="mode-strip"><span class="mode-badge active" id="liveBadge">â— LIVE MONITOR</span><span class="mode-badge" id="replayBadge">VERIFIED REPLAY</span><span class="mode-badge">READ-ONLY</span><span class="mode-badge">NO DECRYPTION</span></div>
 </section>
 <section class="stats">
   <div class="stat"><div class="label">TOTAL INCIDENTS</div><div class="value" id="totalAlerts">0</div></div>
   <div class="stat"><div class="label">HIGH / CRITICAL</div><div class="value" id="highAlerts">0</div></div>
-  <div class="stat"><div class="label">AI DETECTORS</div><div class="value">4</div></div>
+  <div class="stat"><div class="label">AI DETECTORS</div><div class="value">6</div></div>
   <div class="stat"><div class="label">PACKETS / SEC</div><div class="value live-value" id="pps">0</div></div>
   <div class="stat"><div class="label">FLOWS / SEC</div><div class="value live-value" id="fps">0</div></div>
   <div class="stat"><div class="label">WINDOWS</div><div class="value live-value" id="windows">0</div></div>
@@ -43,7 +43,7 @@ button,select{font:inherit}.header{height:70px;padding:0 30px;display:flex;align
       <select class="select" id="iface"><option value="">Default capture interface</option></select>
       <div class="control-row"><button class="btn primary" id="startBtn" onclick="startLive()">START LIVE</button><button class="btn stop" id="stopBtn" onclick="stopLive()" disabled>STOP</button><button class="btn clear" id="clearBtn" onclick="clearAlerts()">CLEAR ALERTS</button></div>
     </div>
-    <div class="monitor-card"><div class="monitor-head"><b>CAPTURE ENGINE</b><span class="capture-state" id="captureState">STOPPED</span></div><div class="meter"><div id="meterBar"></div></div><div class="mini"><div><b id="seen">0</b><span>packets seen</span></div><div><b id="flowsSeen">0</b><span>flows observed</span></div><div><b id="detections">0</b><span>live detections</span></div><div><b id="lastWindow">—</b><span>last window</span></div></div></div>
+    <div class="monitor-card"><div class="monitor-head"><b>CAPTURE ENGINE</b><span class="capture-state" id="captureState">STOPPED</span></div><div class="meter"><div id="meterBar"></div></div><div class="mini"><div><b id="seen">0</b><span>packets seen</span></div><div><b id="flowsSeen">0</b><span>flows observed</span></div><div><b id="detections">0</b><span>live detections</span></div><div><b id="lastWindow">â€”</b><span>last window</span></div></div></div>
     <div class="notice"><b>Live mode:</b> captures metadata only. On Windows, Scapy requires Npcap. Run the terminal as Administrator if capture permissions are required.</div>
     <h2 class="title" style="margin-top:18px">Verified Attack Replay</h2><p class="sub">Deterministic benchmark scenarios through the same production ML pipeline.</p>
     <div class="scenarios">
@@ -51,14 +51,14 @@ button,select{font:inherit}.header{height:70px;padding:0 30px;display:flex;align
       <button class="scenario" onclick="runScenario('c2')"><strong>C2 ACTIVITY</strong><small>Real C2 HGB V3 inference</small></button>
       <button class="scenario" onclick="runScenario('encrypted')"><strong>ENCRYPTED TRAFFIC</strong><small>Metadata-only encrypted-flow detection</small></button>
       <button class="scenario ddos" onclick="runScenario('ddos')"><strong>DDoS ATTACK</strong><small>Verified temporal attack window</small></button>
-      <button class="scenario corr" onclick="runScenario('correlated')"><strong>⚠ CORRELATED ATTACK</strong><small>C2 + DNS + encrypted evidence</small></button>
-      <button class="btn replay" onclick="runReplay()">▶ RUN FULL VERIFIED REPLAY</button>
+      <button class="scenario corr" onclick="runScenario('correlated')"><strong>âš  CORRELATED ATTACK</strong><small>C2 + DNS + encrypted evidence</small></button>
+      <button class="btn replay" onclick="runReplay()">â–¶ RUN FULL VERIFIED REPLAY</button>
     </div>
     <div class="message" id="message"></div>
   </aside>
   <section class="panel"><div class="feed-head"><div><h2 class="title">Live Threat Feed</h2><div class="sub" style="margin-bottom:0">AI detections from live capture or verified replay.</div></div><div class="refresh">AUTO REFRESH 1.5s</div></div><div class="feed" id="alerts"><div class="empty">No incidents yet.<br><br>Start live monitoring or run the verified replay.</div></div></section>
 </section>
-<div class="footer">CODEZILLA • Passive Multi-Detector AI Security Platform</div>
+<div class="footer">CODEZILLA â€¢ Passive Multi-Detector AI Security Platform</div>
 </main>
 <script>
 const API="";
@@ -81,13 +81,14 @@ async function clearAlerts(){
     await loadAlerts();
   }catch(e){$("message").textContent="Clear alerts error: "+e.message;}
 }
-async function pollLive(){try{let r=await fetch(API+"/live/status");let d=await r.json();$("pps").textContent=Math.round(d.packet_rate||0);$("fps").textContent=(d.flow_rate||0).toFixed(1);$("windows").textContent=d.windows_processed||0;$("seen").textContent=d.packets_seen||0;$("flowsSeen").textContent=d.flows_seen||0;$("detections").textContent=d.detections||0;$("lastWindow").textContent=d.last_window?d.last_window.slice(11,19):"—";$("captureState").textContent=d.running?"CAPTURING":"STOPPED";$("captureState").className="capture-state "+(d.running?"live":"");$("meterBar").style.width=Math.min(100,Math.round((d.packet_rate||0)/10))+"%";if(d.last_error)$("message").textContent=d.last_error;}catch(e){}}
+async function pollLive(){try{let r=await fetch(API+"/live/status");let d=await r.json();$("pps").textContent=Math.round(d.packet_rate||0);$("fps").textContent=(d.flow_rate||0).toFixed(1);$("windows").textContent=d.windows_processed||0;$("seen").textContent=d.packets_seen||0;$("flowsSeen").textContent=d.flows_seen||0;$("detections").textContent=d.detections||0;$("lastWindow").textContent=d.last_window?d.last_window.slice(11,19):"â€”";$("captureState").textContent=d.running?"CAPTURING":"STOPPED";$("captureState").className="capture-state "+(d.running?"live":"");$("meterBar").style.width=Math.min(100,Math.round((d.packet_rate||0)/10))+"%";if(d.last_error)$("message").textContent=d.last_error;}catch(e){}}
 async function runScenario(s){$("message").textContent="Running "+s.toUpperCase()+"...";let endpoint=s==='ddos'?"/demo/ddos":"/demo/"+encodeURIComponent(s);try{let r=await fetch(API+endpoint,{method:"POST"});let d=await r.json();if(!r.ok)throw new Error(d.detail||"Detection failed");$("message").textContent=s.toUpperCase()+" completed: "+(d.prediction||"OK");await loadAlerts();}catch(e){$("message").textContent="Replay error: "+e.message;}}
-async function runReplay(){$("message").textContent="Running full verified attack replay...";try{let r=await fetch(API+"/demo/replay-live",{method:"POST"});let d=await r.json();if(!r.ok)throw new Error(d.detail||"Replay failed");$("message").textContent="Verified replay started — watch the feed.";}catch(e){$("message").textContent="Replay error: "+e.message;}}
+async function runReplay(){$("message").textContent="Running full verified attack replay...";try{let r=await fetch(API+"/demo/replay-live",{method:"POST"});let d=await r.json();if(!r.ok)throw new Error(d.detail||"Replay failed");$("message").textContent="Verified replay started â€” watch the feed.";}catch(e){$("message").textContent="Replay error: "+e.message;}}
 function escapeHtml(v){return String(v??"").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));}
-function renderAlerts(items){if(!items.length){$("alerts").innerHTML='<div class="empty">No threat alerts yet.<br><br>Live traffic is being observed passively.</div>';return;}$("alerts").innerHTML=items.map(a=>{let ev=(a.evidence||[]).slice(0,8);let threats=(a.threats||[]).map(t=>t.detector).join(" + ");let score=(Number(a.score||0)*100).toFixed(1)+"%";return `<article class="alert"><div class="alert-top"><div><div class="alert-name">${escapeHtml(a.primary_threat||"THREAT")}</div><div class="meta">Source: ${escapeHtml(a.source||"Global / observed")}<br>Time: ${escapeHtml(a.time_window||"—")}</div><span class="badge">${escapeHtml(a.severity||"HIGH")}</span></div><div class="score">${score}<div class="score-label">MODEL SCORE</div></div></div><div class="det">Detectors: ${escapeHtml(threats||a.primary_threat||"—")}<br>Active: ${escapeHtml(a.detector_count||1)}</div><div class="evidence"><div class="ev-title">Supporting Evidence</div>${ev.length?ev.map(x=>`<div class="ev"><span>${escapeHtml(x.feature||x.signal||"signal")}</span><b>${escapeHtml(x.feature_value??x.value??x.contribution??"")}</b></div>`).join(""):"<div class='meta'>No evidence provided.</div>"}</div></article>`;}).join("");}
+function renderAlerts(items){if(!items.length){$("alerts").innerHTML='<div class="empty">No threat alerts yet.<br><br>Live traffic is being observed passively.</div>';return;}$("alerts").innerHTML=items.map(a=>{let ev=(a.evidence||[]).slice(0,8);let threats=(a.threats||[]).map(t=>t.detector).join(" + ");let score=(Number(a.score||0)*100).toFixed(1)+"%";return `<article class="alert"><div class="alert-top"><div><div class="alert-name">${escapeHtml(a.primary_threat||"THREAT")}</div><div class="meta">Source: ${escapeHtml(a.source||"Global / observed")}<br>Time: ${escapeHtml(a.time_window||"â€”")}</div><span class="badge">${escapeHtml(a.severity||"HIGH")}</span></div><div class="score">${score}<div class="score-label">MODEL SCORE</div></div></div><div class="det">Detectors: ${escapeHtml(threats||a.primary_threat||"â€”")}<br>Active: ${escapeHtml(a.detector_count||1)}</div><div class="evidence"><div class="ev-title">Supporting Evidence</div>${ev.length?ev.map(x=>`<div class="ev"><span>${escapeHtml(x.feature||x.signal||"signal")}</span><b>${escapeHtml(x.feature_value??x.value??x.contribution??"")}</b></div>`).join(""):"<div class='meta'>No evidence provided.</div>"}</div></article>`;}).join("");}
 async function loadAlerts(){try{let r=await fetch(API+"/alerts");let d=await r.json();let items=d.alerts||[];$("totalAlerts").textContent=items.length;$("highAlerts").textContent=items.filter(x=>["HIGH","CRITICAL"].includes(String(x.severity).toUpperCase())).length;renderAlerts(items);}catch(e){}}
 checkHealth();loadInterfaces();loadAlerts();pollLive();setInterval(checkHealth,5000);setInterval(pollLive,1500);setInterval(loadAlerts,1500);
 </script>
 </body>
 </html>
+
