@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CODEZILLA — SIH Judge Mode</title>
+<style>
+:root{--bg:#050912;--panel:#0b1422;--panel2:#101c2c;--line:#20344a;--text:#edf5ff;--muted:#8191a8;--cyan:#40dcff;--green:#43e8a0;--red:#ff5d74;--amber:#ffb14b;--purple:#b37aff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#0a1829 0,#050912 45%,#02050a 100%);color:var(--text);font-family:Segoe UI,Arial,sans-serif}.wrap{max-width:1500px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:18px 20px;border:1px solid var(--line);background:rgba(9,18,31,.94);border-radius:16px;position:sticky;top:12px;z-index:5;backdrop-filter:blur(10px)}.brand{font-size:25px;font-weight:900;letter-spacing:1px}.brand span{color:var(--cyan)}.sub{color:var(--muted);font-size:12px;margin-top:5px}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid #2b425b;background:#0f1b2a;color:#e8f1fb;border-radius:9px;padding:10px 13px;cursor:pointer;font-weight:800;font-size:11px}.btn:hover{border-color:var(--cyan)}.btn.primary{background:#0b2732;border-color:#1f7b8f;color:#8feaff}.btn.danger{background:#2a1218;border-color:#703242;color:#ff9aaa}.grid{display:grid;gap:15px;margin-top:16px}.hero{grid-template-columns:2fr 1fr}.stats{grid-template-columns:repeat(6,1fr)}.two{grid-template-columns:1.2fr .8fr}.three{grid-template-columns:repeat(3,1fr)}.card{background:rgba(10,19,32,.93);border:1px solid var(--line);border-radius:15px;padding:18px}.eyebrow{font-size:9px;color:#71839b;font-weight:900;letter-spacing:1px;text-transform:uppercase}.h1{font-size:35px;font-weight:950;margin:8px 0}.h2{font-size:17px;font-weight:900;margin:0 0 7px}.big{font-size:28px;font-weight:950;margin-top:6px}.cyan{color:var(--cyan)}.green{color:var(--green)}.red{color:var(--red)}.amber{color:var(--amber)}.purple{color:var(--purple)}.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.chip{border:1px solid #294158;background:#0b1726;border-radius:999px;padding:6px 9px;font-size:9px;font-weight:800;color:#b8c9dc}.chip.good{border-color:#22614e;color:#86efc5}.chip.cyan{border-color:#20596a;color:#8eeaff}.chip.warn{border-color:#685027;color:#ffd08a}.callout{margin-top:14px;padding:12px;border-radius:10px;background:#091521;border:1px solid #1c3348;color:#aab9ca;font-size:10px;line-height:1.6}.detectors{display:grid;grid-template-columns:repeat(6,1fr);gap:9px;margin-top:12px}.det{padding:11px;border:1px solid #23394f;background:#091423;border-radius:10px}.det b{display:block;font-size:11px}.det span{display:block;color:#7689a0;font-size:8px;margin-top:4px}.badge{display:inline-block;margin-top:7px;padding:4px 6px;border-radius:5px;font-size:7px;font-weight:900}.ml{background:#10283a;color:#7edfff}.behavior{background:#281c36;color:#d6b5ff}.table{width:100%;border-collapse:collapse;font-size:10px;margin-top:8px}.table th{padding:8px;text-align:left;color:#71839b;border-bottom:1px solid #203448;font-size:8px}.table td{padding:9px 8px;border-bottom:1px solid #132638;color:#b7c5d4}.pill{padding:4px 6px;border-radius:5px;background:#301620;color:#ff899c;font-size:7px;font-weight:900}.meter{height:8px;background:#101d2c;border-radius:10px;overflow:hidden;margin-top:10px}.meter div{height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--green))}.mono{font-family:Consolas,monospace;color:#9bb0c7;font-size:9px;white-space:pre-wrap;word-break:break-word;max-height:260px;overflow:auto}.footer{text-align:center;color:#50627a;font-size:9px;padding:18px}.status{font-size:10px;color:var(--muted)}@media(max-width:1100px){.hero,.two,.three{grid-template-columns:1fr}.stats{grid-template-columns:repeat(3,1fr)}.detectors{grid-template-columns:repeat(3,1fr)}}@media(max-width:650px){.wrap{padding:12px}.stats{grid-template-columns:repeat(2,1fr)}.detectors{grid-template-columns:repeat(2,1fr)}.top{position:static;align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div><div class="brand">CODE<span>ZILLA</span></div><div class="sub">SIH Judge Mode · CyberSentinel AI · presentation-ready verification</div></div>
+  <div class="actions"><button class="btn primary" onclick="runAll()">RUN 7-SCENARIO DEMO</button><button class="btn" onclick="refreshAll()">REFRESH</button><button class="btn danger" onclick="clearAlerts()">CLEAR ALERTS</button></div>
+</header>
+
+<section class="grid hero">
+  <div class="card">
+    <div class="eyebrow">Mission</div>
+    <div class="h1">Passive, evidence-first threat detection.</div>
+    <div class="sub">A read-only SOC pipeline that observes network metadata, scores threat behavior and correlates detector evidence without decrypting payloads or transmitting attack traffic.</div>
+    <div class="chips"><span class="chip good">READ-ONLY</span><span class="chip cyan">NO DECRYPTION</span><span class="chip cyan">NO PROBES</span><span class="chip good">6 DETECTORS</span><span class="chip warn">EXPLAINABLE EVIDENCE</span></div>
+    <div class="callout"><b>What is demonstrated:</b> four bundled ML detectors plus two transparent behavioral-policy detectors. Reconnaissance and Data Exfiltration scores are behavior scores, not calibrated ML probabilities.</div>
+  </div>
+  <div class="card">
+    <div class="eyebrow">Runtime</div>
+    <div class="h2">System Status</div>
+    <div id="runtime" class="mono">Loading...</div>
+    <div class="meter"><div id="healthMeter"></div></div>
+  </div>
+</section>
+
+<section class="grid stats">
+  <div class="card"><div class="eyebrow">Detector Count</div><div class="big cyan" id="detectorCount">6</div></div>
+  <div class="card"><div class="eyebrow">Verified Scenarios</div><div class="big purple" id="scenarioCount">0</div></div>
+  <div class="card"><div class="eyebrow">Threat Alerts</div><div class="big red" id="alertCount">0</div></div>
+  <div class="card"><div class="eyebrow">High / Critical</div><div class="big amber" id="highCount">0</div></div>
+  <div class="card"><div class="eyebrow">Live Windows</div><div class="big cyan" id="windows">0</div></div>
+  <div class="card"><div class="eyebrow">Last Error</div><div class="big green" id="lastError">NONE</div></div>
+</section>
+
+<section class="card" style="margin-top:15px">
+  <div class="eyebrow">Threat Coverage</div>
+  <div class="h2" style="margin-top:5px">Six-category detection layer</div>
+  <div class="detectors">
+    <div class="det"><b>DDoS</b><span>Traffic flood anomaly</span><span class="badge ml">ML</span></div>
+    <div class="det"><b>C2</b><span>Beacon / botnet behavior</span><span class="badge ml">ML</span></div>
+    <div class="det"><b>DNS</b><span>Suspicious DNS behavior</span><span class="badge ml">ML</span></div>
+    <div class="det"><b>Encrypted</b><span>Metadata-only traffic</span><span class="badge ml">ML</span></div>
+    <div class="det"><b>Recon</b><span>Host / port fan-out</span><span class="badge behavior">BEHAVIOR</span></div>
+    <div class="det"><b>Exfil</b><span>Suspicious transfer pattern</span><span class="badge behavior">BEHAVIOR</span></div>
+  </div>
+</section>
+
+<section class="grid two">
+  <div class="card">
+    <div class="eyebrow">Architecture</div>
+    <div class="h2" style="margin-top:5px">Observe → Feature → Detect → Correlate → Explain</div>
+    <div class="chips">
+      <span class="chip cyan">Scapy + Npcap</span><span class="chip">5s windows</span><span class="chip">Feature routing</span><span class="chip">Detector adapters</span><span class="chip">Unified alerts</span>
+    </div>
+    <div class="callout">The system keeps detector evidence attached to the incident, so a judge can see not only that a threat fired, but which observed features drove the result.</div>
+  </div>
+  <div class="card">
+    <div class="eyebrow">Judge Checklist</div>
+    <table class="table">
+      <tr><td>Six threat categories</td><td><span class="pill">READY</span></td></tr>
+      <tr><td>7-scenario deterministic replay</td><td><span class="pill">READY</span></td></tr>
+      <tr><td>Evidence attached to alerts</td><td><span class="pill">READY</span></td></tr>
+      <tr><td>Passive live telemetry</td><td><span class="pill">READY</span></td></tr>
+      <tr><td>No payload decryption</td><td><span class="pill">READY</span></td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="card" style="margin-top:15px">
+  <div class="eyebrow">Latest Evidence</div>
+  <div class="h2" style="margin-top:5px">Detection results from the current run</div>
+  <table class="table">
+    <thead><tr><th>Threat</th><th>Severity</th><th>Score</th><th>Source</th><th>Evidence</th></tr></thead>
+    <tbody id="results"><tr><td colspan="5">No results yet. Run the 7-scenario demo.</td></tr></tbody>
+  </table>
+</section>
+
+<section class="grid three">
+  <div class="card"><div class="eyebrow">Safety</div><div class="h2">Passive by design</div><div class="sub">No probing, packet injection, blocking or mitigation commands.</div></div>
+  <div class="card"><div class="eyebrow">Explainability</div><div class="h2">Evidence, not magic</div><div class="sub">Feature values remain attached to each alert for analyst review.</div></div>
+  <div class="card"><div class="eyebrow">Deployment</div><div class="h2">Edge-friendly MVP</div><div class="sub">Runs locally with Python 3.12, bundled models and Scapy/Npcap for Windows capture.</div></div>
+</section>
+<div class="footer">CODEZILLA · SIH26-26145 · Judge Mode</div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+let currentHealth=null;
+async function health(){try{const r=await fetch('/health');const d=await r.json();currentHealth=d;$('detectorCount').textContent=(d.detectors||[]).length;$('runtime').textContent='API: '+d.status.toUpperCase()+'\nMode: '+d.architecture.ingestion+'\nDecryption: '+d.architecture.payload_decryption+'\nPacket transmission: '+d.architecture.packet_transmission;$('healthMeter').style.width='100%';$('lastError').textContent='NONE';}catch(e){$('runtime').textContent='API OFFLINE';$('healthMeter').style.width='0%';$('lastError').textContent='ERROR';}}
+async function live(){try{const r=await fetch('/live/status');const d=await r.json();$('windows').textContent=d.windows_processed||0;if(d.last_error)$('lastError').textContent='ERROR';}catch(e){}}
+function evidence(a){return (a.evidence||[]).slice(0,3).map(x=>x.feature+': '+x.feature_value).join(' · ')||'—'}
+async function alerts(){try{const r=await fetch('/alerts');const d=await r.json();const list=d.alerts||[];$('alertCount').textContent=d.count||0;$('highCount').textContent=list.filter(x=>['HIGH','CRITICAL'].includes(x.severity)).length;const rows=list.slice(0,12).map(a=>`<tr><td><b>${a.primary_threat||'THREAT'}</b></td><td>${a.severity||'—'}</td><td>${((a.score||0)*100).toFixed(1)}%</td><td>${a.source||'—'}</td><td>${evidence(a)}</td></tr>`).join('');$('results').innerHTML=rows||'<tr><td colspan="5">No alerts yet.</td></tr>';}catch(e){}}
+async function runAll(){try{clearStatus('Running 7 verified scenarios...');const r=await fetch('/demo/run-all',{method:'POST'});const d=await r.json();$('scenarioCount').textContent=d.scenarios_run||0;await alerts();clearStatus('7-scenario verified run complete.');}catch(e){clearStatus('Run failed: '+e.message)}}
+async function clearAlerts(){try{await fetch('/alerts',{method:'DELETE'});$('scenarioCount').textContent=0;await alerts();clearStatus('Alerts cleared.');}catch(e){clearStatus('Clear failed: '+e.message)}}
+function clearStatus(t){document.title='CODEZILLA — '+t}
+async function refreshAll(){await health();await live();await alerts()}
+health();live();alerts();setInterval(refreshAll,2500);
+</script>
+</body>
+</html>
