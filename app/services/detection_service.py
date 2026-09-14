@@ -9,26 +9,39 @@ from src.detectors.c2_detector import detect as detect_c2
 from src.detectors.dns_detector import detect as detect_dns
 from src.detectors.encrypted_detector import detect as detect_encrypted
 
+# Extended SIH threat categories
+from src.detectors.recon_detector import detect as detect_recon
+from src.detectors.exfil_detector import detect as detect_exfil
+
 
 # ============================================================
 # CODEZILLA DETECTOR SERVICE
 # ============================================================
 
 
-def _single_row(features: Dict[str, Any]) -> pd.DataFrame:
+def _single_row(
+    features: Dict[str, Any],
+) -> pd.DataFrame:
     """
     Convert one feature dictionary into a one-row DataFrame.
     """
 
-    if not isinstance(features, dict):
+    if not isinstance(
+        features,
+        dict,
+    ):
         raise TypeError(
             "Detector features must be provided as a dictionary."
         )
 
-    return pd.DataFrame([features])
+    return pd.DataFrame(
+        [features]
+    )
 
 
-def _extract_score(result: Dict[str, Any]) -> float:
+def _extract_score(
+    result: Dict[str, Any],
+) -> float:
     """
     Normalize score field.
 
@@ -40,16 +53,31 @@ def _extract_score(result: Dict[str, Any]) -> float:
 
     raw_score = result.get(
         "model_score",
-        result.get("score", 0.0),
+        result.get(
+            "score",
+            0.0,
+        ),
     )
 
     try:
-        score = float(raw_score)
-    except (TypeError, ValueError):
+        score = float(
+            raw_score
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
         score = 0.0
 
-    # Keep score inside the valid probability range.
-    return max(0.0, min(1.0, score))
+    # Keep score inside the valid display range.
+    return max(
+        0.0,
+        min(
+            1.0,
+            score,
+        ),
+    )
 
 
 def _extract_supporting_features(
@@ -61,13 +89,19 @@ def _extract_supporting_features(
 
     evidence = result.get(
         "supporting_features",
-        result.get("evidence", []),
+        result.get(
+            "evidence",
+            [],
+        ),
     )
 
     if evidence is None:
         return []
 
-    if not isinstance(evidence, list):
+    if not isinstance(
+        evidence,
+        list,
+    ):
         return []
 
     return evidence
@@ -82,7 +116,9 @@ def _normalize_detector_result(
     common detector-result format.
     """
 
-    score = _extract_score(result)
+    score = _extract_score(
+        result
+    )
 
     prediction = str(
         result.get(
@@ -106,7 +142,9 @@ def _normalize_detector_result(
     ).upper()
 
     supporting_features = (
-        _extract_supporting_features(result)
+        _extract_supporting_features(
+            result
+        )
     )
 
     normalized = {
@@ -134,9 +172,13 @@ def run_detector(
         C2
         DNS
         ENCRYPTED_TRAFFIC
+        RECONNAISSANCE
+        DATA_EXFILTRATION
     """
 
-    dataframe = _single_row(features)
+    dataframe = _single_row(
+        features
+    )
 
     # --------------------------------------------------------
     # Run selected detector
@@ -170,6 +212,20 @@ def run_detector(
             top_k=5,
         )
 
+    elif detector_name == "RECONNAISSANCE":
+
+        results = detect_recon(
+            dataframe,
+            top_k=5,
+        )
+
+    elif detector_name == "DATA_EXFILTRATION":
+
+        results = detect_exfil(
+            dataframe,
+            top_k=5,
+        )
+
     else:
 
         raise ValueError(
@@ -198,7 +254,10 @@ def run_detector(
 
     first_result = results[0]
 
-    if not isinstance(first_result, dict):
+    if not isinstance(
+        first_result,
+        dict,
+    ):
 
         raise TypeError(
             f"{detector_name} detector returned "
@@ -212,7 +271,9 @@ def run_detector(
     )
 
 
-def _severity_rank(severity: str) -> int:
+def _severity_rank(
+    severity: str,
+) -> int:
     """
     Convert severity to sortable numeric rank.
     """
@@ -225,7 +286,9 @@ def _severity_rank(severity: str) -> int:
     }
 
     return ranking.get(
-        str(severity).upper(),
+        str(
+            severity
+        ).upper(),
         0,
     )
 
@@ -247,6 +310,7 @@ def analyze_request(
     # --------------------------------------------------------
 
     detector_inputs = {
+
         "DDoS": getattr(
             request,
             "ddos_features",
@@ -270,13 +334,32 @@ def analyze_request(
             "encrypted_features",
             None,
         ),
+
+        # ----------------------------------------------------
+        # Extended SIH threat categories
+        # ----------------------------------------------------
+
+        "RECONNAISSANCE": getattr(
+            request,
+            "recon_features",
+            None,
+        ),
+
+        "DATA_EXFILTRATION": getattr(
+            request,
+            "exfil_features",
+            None,
+        ),
     }
 
     # --------------------------------------------------------
     # Run supplied detectors
     # --------------------------------------------------------
 
-    for detector_name, features in detector_inputs.items():
+    for (
+        detector_name,
+        features,
+    ) in detector_inputs.items():
 
         if features is None:
             continue
@@ -298,20 +381,24 @@ def analyze_request(
             # The error is represented in the response rather
             # than crashing the complete request.
 
-            detector_results.append({
-                "detector": detector_name,
-                "prediction": "ERROR",
-                "score": 0.0,
-                "model_score": 0.0,
-                "threat_class": detector_name,
-                "severity": "LOW",
-                "supporting_features": [
-                    {
-                        "feature": "detector_error",
-                        "feature_value": str(exc),
-                    }
-                ],
-            })
+            detector_results.append(
+                {
+                    "detector": detector_name,
+                    "prediction": "ERROR",
+                    "score": 0.0,
+                    "model_score": 0.0,
+                    "threat_class": detector_name,
+                    "severity": "LOW",
+                    "supporting_features": [
+                        {
+                            "feature": "detector_error",
+                            "feature_value": str(
+                                exc
+                            ),
+                        }
+                    ],
+                }
+            )
 
     # --------------------------------------------------------
     # Active threats only
@@ -320,7 +407,8 @@ def analyze_request(
     active_threats = [
         result
         for result in detector_results
-        if result["prediction"] not in {
+        if result["prediction"]
+        not in {
             "BENIGN",
             "ERROR",
         }
@@ -336,19 +424,25 @@ def analyze_request(
             "prediction": "BENIGN",
             "severity": "LOW",
             "score": 0.0,
+
             "primary_threat": None,
+
             "source": getattr(
                 request,
                 "source",
                 None,
             ),
+
             "time_window": getattr(
                 request,
                 "time_window",
                 None,
             ),
+
             "detector_count": 0,
+
             "threats": [],
+
             "evidence": [],
         }
 
@@ -359,7 +453,10 @@ def analyze_request(
     strongest = max(
         active_threats,
         key=lambda result: float(
-            result.get("score", 0.0)
+            result.get(
+                "score",
+                0.0,
+            )
         ),
     )
 
@@ -414,6 +511,7 @@ def analyze_request(
     # --------------------------------------------------------
 
     final_alert = {
+
         "prediction": "THREAT",
 
         "severity": overall_severity,

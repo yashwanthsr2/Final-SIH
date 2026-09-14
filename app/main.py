@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
 import json
 import sys
 import threading
@@ -22,7 +23,10 @@ from fastapi.staticfiles import StaticFiles
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+    sys.path.insert(
+        0,
+        str(PROJECT_ROOT),
+    )
 
 
 # ============================================================
@@ -39,6 +43,10 @@ from app.services.detection_service import (
 )
 
 from src.live_monitor import LiveMonitor
+
+from src.recon_exfil_live import (
+    attach_live_monitor,
+)
 
 
 # ============================================================
@@ -72,19 +80,24 @@ app.add_middleware(
 # ALERT STORE
 # ============================================================
 
-ALERTS: List[Dict[str, Any]] = []
+ALERTS: List[
+    Dict[str, Any]
+] = []
 
 MAX_ALERTS = 100
 
 
 def store_alert(
-    result: Dict[str, Any]
+    result: Dict[str, Any],
 ) -> None:
     """
     Store only actual threat results.
     """
 
-    if result.get("prediction") != "THREAT":
+    if result.get(
+        "prediction"
+    ) != "THREAT":
+
         return
 
     ALERTS.insert(
@@ -93,7 +106,10 @@ def store_alert(
     )
 
     if len(ALERTS) > MAX_ALERTS:
-        del ALERTS[MAX_ALERTS:]
+
+        del ALERTS[
+            MAX_ALERTS:
+        ]
 
 
 # ============================================================
@@ -117,59 +133,124 @@ STATIC_DIR.mkdir(
 # ============================================================
 
 def load_verified_c2_demo() -> Dict[str, Any]:
-    """Load the real unseen C2 sample saved from the V3 test set."""
+    """
+    Load the real unseen C2 sample saved from the V3 test set.
+    """
 
-    c2_path = PROJECT_ROOT / "evaluation" / "packaging" / "c2_verified_attack_input.csv"
-    schema_path = PROJECT_ROOT / "models" / "c2_feature_schema.json"
+    c2_path = (
+        PROJECT_ROOT
+        / "evaluation"
+        / "packaging"
+        / "c2_verified_attack_input.csv"
+    )
+
+    schema_path = (
+        PROJECT_ROOT
+        / "models"
+        / "c2_feature_schema.json"
+    )
 
     if not c2_path.exists():
-        raise FileNotFoundError(f"C2 verified sample not found: {c2_path}")
+
+        raise FileNotFoundError(
+            f"C2 verified sample not found: {c2_path}"
+        )
 
     if not schema_path.exists():
-        raise FileNotFoundError(f"C2 feature schema not found: {schema_path}")
 
-    c2_data = pd.read_csv(c2_path)
+        raise FileNotFoundError(
+            f"C2 feature schema not found: {schema_path}"
+        )
+
+    c2_data = pd.read_csv(
+        c2_path
+    )
 
     if c2_data.empty:
-        raise ValueError("C2 verified sample is empty.")
 
-    with open(schema_path, "r", encoding="utf-8") as f:
-        schema = json.load(f)
+        raise ValueError(
+            "C2 verified sample is empty."
+        )
 
-    required_features = schema.get("features", [])
+    with open(
+        schema_path,
+        "r",
+        encoding="utf-8",
+    ) as f:
 
-    if len(required_features) != 62:
-        raise ValueError(f"Expected 62 C2 features, found {len(required_features)}.")
+        schema = json.load(
+            f
+        )
 
-    missing = [feature for feature in required_features if feature not in c2_data.columns]
+    required_features = (
+        schema.get(
+            "features",
+            [],
+        )
+    )
+
+    if len(
+        required_features
+    ) != 62:
+
+        raise ValueError(
+            "Expected 62 C2 features, "
+            f"found {len(required_features)}."
+        )
+
+    missing = [
+        feature
+        for feature in required_features
+        if feature not in c2_data.columns
+    ]
 
     if missing:
+
         raise ValueError(
-            "C2 verified sample is missing required features: "
-            + ", ".join(missing[:10])
-            + ("..." if len(missing) > 10 else "")
+            "C2 verified sample is missing "
+            "required features: "
+            + ", ".join(
+                missing[:10]
+            )
+            + (
+                "..."
+                if len(missing) > 10
+                else ""
+            )
         )
 
     row = c2_data.iloc[0]
 
-    return {feature: float(row[feature]) for feature in required_features}
+    return {
+        feature: float(
+            row[feature]
+        )
+        for feature in required_features
+    }
 
 
-VERIFIED_C2_TIME_WINDOW = "2011-08-10T15:13:40"
+VERIFIED_C2_TIME_WINDOW = (
+    "2011-08-10T15:13:40"
+)
 
 
 # ============================================================
 # VERIFIED DEMO SCENARIOS
 # ============================================================
 
-VERIFIED_SCENARIOS: Dict[str, Dict[str, Any]] = {
+VERIFIED_SCENARIOS: Dict[
+    str,
+    Dict[str, Any],
+] = {
 
     # --------------------------------------------------------
     # DNS
     # --------------------------------------------------------
 
     "dns": {
-        "source": "147.32.84.165",
+
+        "source":
+            "147.32.84.165",
 
         "time_window":
             "2011-08-10T13:33:00",
@@ -226,6 +307,7 @@ VERIFIED_SCENARIOS: Dict[str, Dict[str, Any]] = {
     # --------------------------------------------------------
 
     "c2": {
+
         "source":
             "147.32.84.165",
 
@@ -242,6 +324,7 @@ VERIFIED_SCENARIOS: Dict[str, Dict[str, Any]] = {
     # --------------------------------------------------------
 
     "encrypted": {
+
         "source":
             "147.32.84.165",
 
@@ -291,7 +374,9 @@ VERIFIED_SCENARIOS: Dict[str, Dict[str, Any]] = {
 # CORRELATED 3-DETECTOR SCENARIO
 # ============================================================
 
-VERIFIED_SCENARIOS["correlated"] = {
+VERIFIED_SCENARIOS[
+    "correlated"
+] = {
 
     "source":
         "147.32.84.165",
@@ -301,12 +386,10 @@ VERIFIED_SCENARIOS["correlated"] = {
 
     # --------------------------------------------------------
     # C2
-    # Uses the verified unseen C2 ML sample.
     # --------------------------------------------------------
 
     "c2_features":
         load_verified_c2_demo(),
-
 
     # --------------------------------------------------------
     # DNS
@@ -357,6 +440,7 @@ VERIFIED_SCENARIOS["correlated"] = {
             2.0,
     },
 
+
     # --------------------------------------------------------
     # ENCRYPTED
     # --------------------------------------------------------
@@ -403,11 +487,26 @@ VERIFIED_SCENARIOS["correlated"] = {
 # LIVE MONITORING
 # ============================================================
 
-def _run_live_alert(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Run the existing unified detector pipeline for live features."""
-    request = DetectionRequest(**payload)
-    result = analyze_request(request)
-    store_alert(result)
+
+def _run_live_alert(
+    payload: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Run the unified detector pipeline for live features.
+    """
+
+    request = DetectionRequest(
+        **payload
+    )
+
+    result = analyze_request(
+        request
+    )
+
+    store_alert(
+        result
+    )
+
     return result
 
 
@@ -417,65 +516,196 @@ LIVE_MONITOR = LiveMonitor(
 )
 
 
-LIVE_REPLAY_LOCK = threading.Lock()
+# ============================================================
+# EXTENDED LIVE DETECTORS
+#
+# Adds:
+#   - Reconnaissance
+#   - Data Exfiltration
+#
+# without replacing the existing four-detector
+# LiveMonitor implementation.
+# ============================================================
+
+attach_live_monitor(
+    LIVE_MONITOR,
+    _run_live_alert,
+)
+
+
+# ============================================================
+# LIVE REPLAY STATE
+# ============================================================
+
+LIVE_REPLAY_LOCK = (
+    threading.Lock()
+)
+
 LIVE_REPLAY_RUNNING = False
 
 
-@app.get("/live/interfaces")
+# ============================================================
+# LIVE INTERFACES
+# ============================================================
+
+
+@app.get(
+    "/live/interfaces"
+)
 def live_interfaces():
-    """Return discoverable packet-capture interfaces."""
-    interfaces = LIVE_MONITOR.list_interfaces()
+    """
+    Return discoverable packet-capture interfaces.
+    """
+
+    interfaces = (
+        LIVE_MONITOR.list_interfaces()
+    )
+
     return {
-        "interfaces": interfaces,
-        "capture_backend": "Scapy + Npcap",
-        "passive_only": True,
+        "interfaces":
+            interfaces,
+
+        "capture_backend":
+            "Scapy + Npcap",
+
+        "passive_only":
+            True,
     }
 
 
-@app.post("/live/start")
-def live_start(interface: Optional[str] = None):
-    """Start passive live packet capture."""
-    return LIVE_MONITOR.start(interface=interface or None)
+# ============================================================
+# START LIVE CAPTURE
+# ============================================================
 
 
-@app.post("/live/stop")
+@app.post(
+    "/live/start"
+)
+def live_start(
+    interface: Optional[str] = None,
+):
+    """
+    Start passive live packet capture.
+    """
+
+    return LIVE_MONITOR.start(
+        interface=interface or None
+    )
+
+
+# ============================================================
+# STOP LIVE CAPTURE
+# ============================================================
+
+
+@app.post(
+    "/live/stop"
+)
 def live_stop():
-    """Stop passive live packet capture."""
+    """
+    Stop passive live packet capture.
+    """
+
     return LIVE_MONITOR.stop()
 
 
-@app.get("/live/status")
+# ============================================================
+# LIVE STATUS
+# ============================================================
+
+
+@app.get(
+    "/live/status"
+)
 def live_status():
-    """Return current live capture telemetry."""
+    """
+    Return current live capture telemetry.
+    """
+
     return LIVE_MONITOR.snapshot()
 
 
-@app.post("/demo/replay-live")
+# ============================================================
+# VERIFIED LIVE REPLAY
+# ============================================================
+
+
+@app.post(
+    "/demo/replay-live"
+)
 def replay_verified_attacks_live():
-    """Run verified detector scenarios sequentially for a presentation-safe replay."""
+    """
+    Run verified detector scenarios sequentially for
+    a presentation-safe replay.
+
+    No packets are generated or transmitted.
+    """
+
     global LIVE_REPLAY_RUNNING
 
     with LIVE_REPLAY_LOCK:
+
         if LIVE_REPLAY_RUNNING:
-            return {"status": "already_running"}
+
+            return {
+                "status":
+                    "already_running"
+            }
+
         LIVE_REPLAY_RUNNING = True
 
     def worker() -> None:
-        global LIVE_REPLAY_RUNNING
-        try:
-            # Presentation-safe, deterministic replay. No packets are generated
-            # or transmitted; only verified feature scenarios are fed through the
-            # same production detection and fusion pipeline.
-            for scenario in ("dns", "c2", "encrypted", "correlated"):
-                payload = VERIFIED_SCENARIOS[scenario]
-                result = analyze_request(DetectionRequest(**payload))
-                store_alert(result)
-                time.sleep(0.9)
 
-            result = run_ddos_demo()
-            # run_ddos_demo already stores the DDoS alert.
+        global LIVE_REPLAY_RUNNING
+
+        try:
+
+            # ------------------------------------------------
+            # Existing verified scenarios
+            # ------------------------------------------------
+
+            for scenario in (
+                "dns",
+                "c2",
+                "encrypted",
+                "correlated",
+            ):
+
+                payload = (
+                    VERIFIED_SCENARIOS[
+                        scenario
+                    ]
+                )
+
+                result = analyze_request(
+                    DetectionRequest(
+                        **payload
+                    )
+                )
+
+                store_alert(
+                    result
+                )
+
+                time.sleep(
+                    0.9
+                )
+
+            # ------------------------------------------------
+            # Verified DDoS
+            # ------------------------------------------------
+
+            result = (
+                run_ddos_demo()
+            )
+
+            # run_ddos_demo already
+            # stores the alert.
+
             _ = result
+
         finally:
+
             LIVE_REPLAY_RUNNING = False
 
     threading.Thread(
@@ -484,12 +714,19 @@ def replay_verified_attacks_live():
         daemon=True,
     ).start()
 
-    return {"status": "started", "mode": "verified_attack_replay"}
+    return {
+        "status":
+            "started",
+
+        "mode":
+            "verified_attack_replay",
+    }
 
 
 # ============================================================
 # HEALTH
 # ============================================================
+
 
 @app.get(
     "/health"
@@ -497,6 +734,7 @@ def replay_verified_attacks_live():
 def health():
 
     return {
+
         "status":
             "ok",
 
@@ -507,17 +745,44 @@ def health():
             "1.0.0",
 
         "detectors": [
+
             "DDoS",
+
             "C2",
+
             "DNS",
+
             "ENCRYPTED_TRAFFIC",
+
+            "RECONNAISSANCE",
+
+            "DATA_EXFILTRATION",
         ],
+
+        "architecture": {
+
+            "ingestion":
+                "passive",
+
+            "payload_decryption":
+                False,
+
+            "packet_transmission":
+                False,
+
+            "recon_detector":
+                "behavioral_policy",
+
+            "exfil_detector":
+                "behavioral_policy",
+        },
     }
 
 
 # ============================================================
 # MAIN DETECTION ENDPOINT
 # ============================================================
+
 
 @app.post(
     "/detect",
@@ -551,12 +816,14 @@ def detect(
 # ALERT HISTORY
 # ============================================================
 
+
 @app.get(
     "/alerts"
 )
 def get_alerts():
 
     return {
+
         "count":
             len(ALERTS),
 
@@ -568,6 +835,7 @@ def get_alerts():
 # ============================================================
 # CLEAR ALERTS
 # ============================================================
+
 
 @app.delete(
     "/alerts"
@@ -586,32 +854,42 @@ def clear_alerts():
 # LIST DEMO SCENARIOS
 # ============================================================
 
+
 @app.get(
     "/demo"
 )
 def list_demo_scenarios():
 
     return {
+
         "scenarios": [
+
             "dns",
+
             "c2",
+
             "encrypted",
+
             "correlated",
+
             "ddos",
+
+            "recon",
+
+            "exfil",
         ]
     }
 
 
 # ============================================================
-# ============================================================
 # DDOS VERIFIED DEMO
 #
 # Final judge-safe implementation:
 # - Uses the packaged, verified 62-feature CSV input.
-# - Does NOT require pandas parquet/pyarrow for the dashboard demo.
-# - Sends the sample through the same production DDoS ML pipeline.
-# - Preserves all other routes, including live monitoring.
+# - Does NOT require pandas parquet/pyarrow for the demo.
+# - Sends the sample through the production DDoS ML pipeline.
 # ============================================================
+
 
 @app.post(
     "/demo/ddos"
@@ -632,55 +910,80 @@ def run_ddos_demo():
     )
 
     if not csv_path.exists():
+
         raise HTTPException(
             status_code=404,
             detail=(
-                "Verified DDoS demo input not found: "
+                "Verified DDoS demo input "
+                "not found: "
                 + str(csv_path)
             ),
         )
 
     if not schema_path.exists():
+
         raise HTTPException(
             status_code=404,
             detail=(
-                "DDoS feature schema not found: "
+                "DDoS feature schema "
+                "not found: "
                 + str(schema_path)
             ),
         )
 
     try:
-        ddos_data = pd.read_csv(csv_path)
+
+        ddos_data = pd.read_csv(
+            csv_path
+        )
 
         with open(
             schema_path,
             "r",
             encoding="utf-8",
         ) as f:
-            dos_schema = json.load(f)
+
+            dos_schema = json.load(
+                f
+            )
 
     except Exception as exc:
+
         raise HTTPException(
             status_code=500,
             detail=(
-                "Failed to load verified DDoS demo input: "
+                "Failed to load verified "
+                "DDoS demo input: "
                 + str(exc)
             ),
         ) from exc
 
     if ddos_data.empty:
-        raise HTTPException(
-            status_code=500,
-            detail="Verified DDoS demo input is empty.",
-        )
 
-    required_features = dos_schema.get("features", [])
-
-    if len(required_features) != 62:
         raise HTTPException(
             status_code=500,
             detail=(
-                "Expected exactly 62 DDoS features, found "
+                "Verified DDoS demo "
+                "input is empty."
+            ),
+        )
+
+    required_features = (
+        dos_schema.get(
+            "features",
+            [],
+        )
+    )
+
+    if len(
+        required_features
+    ) != 62:
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Expected exactly 62 "
+                "DDoS features, found "
                 f"{len(required_features)}."
             ),
         )
@@ -692,40 +995,74 @@ def run_ddos_demo():
     ]
 
     if missing_features:
+
         raise HTTPException(
             status_code=500,
             detail={
-                "error": "DDoS feature mismatch",
-                "missing_features": missing_features,
+                "error":
+                    "DDoS feature mismatch",
+
+                "missing_features":
+                    missing_features,
             },
         )
 
-    selected = ddos_data.iloc[0]
-    ddos_payload: Dict[str, float] = {}
+    selected = (
+        ddos_data.iloc[0]
+    )
+
+    ddos_payload: Dict[
+        str,
+        float,
+    ] = {}
 
     for feature in required_features:
-        value = selected[feature]
+
+        value = selected[
+            feature
+        ]
 
         try:
-            ddos_payload[feature] = float(value)
-        except (TypeError, ValueError):
+
+            ddos_payload[
+                feature
+            ] = float(
+                value
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+
             raise HTTPException(
                 status_code=500,
                 detail=(
-                    f"Invalid DDoS value for '{feature}': {value}"
+                    f"Invalid DDoS value "
+                    f"for '{feature}': "
+                    f"{value}"
                 ),
             )
 
     try:
+
         request = DetectionRequest(
-            source="VERIFIED-DDOS-SAMPLE",
-            time_window="VERIFIED-BENCHMARK-WINDOW",
-            ddos_features=ddos_payload,
+            source=
+                "VERIFIED-DDOS-SAMPLE",
+
+            time_window=
+                "VERIFIED-BENCHMARK-WINDOW",
+
+            ddos_features=
+                ddos_payload,
         )
 
-        result = analyze_request(request)
+        result = analyze_request(
+            request
+        )
 
     except Exception as exc:
+
         raise HTTPException(
             status_code=500,
             detail=(
@@ -734,31 +1071,330 @@ def run_ddos_demo():
             ),
         ) from exc
 
-    store_alert(result)
+    store_alert(
+        result
+    )
 
-    result["demo_source"] = "verified_ddos_csv"
-    result["demo_input"] = str(csv_path.relative_to(PROJECT_ROOT))
+    result[
+        "demo_source"
+    ] = (
+        "verified_ddos_csv"
+    )
+
+    result[
+        "demo_input"
+    ] = str(
+        csv_path.relative_to(
+            PROJECT_ROOT
+        )
+    )
 
     if "score" in result:
+
         try:
-            result["verified_model_score"] = float(result["score"])
-        except (TypeError, ValueError):
+
+            result[
+                "verified_model_score"
+            ] = float(
+                result[
+                    "score"
+                ]
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+
             pass
 
     return result
 
 
 # ============================================================
-# RUN ALL DEMO SCENARIOS
+# RECONNAISSANCE DEMO
 #
-# IMPORTANT:
-# This route MUST appear before /demo/{scenario}.
+# Synthetic feature replay only.
+#
+# No network packets are generated.
+# No scanning is performed.
 # ============================================================
 
-#
-# IMPORTANT:
-# This route MUST appear before /demo/{scenario}.
+
+@app.post(
+    "/demo/recon"
+)
+def run_recon_demo():
+
+    payload = {
+
+        "source":
+            "VERIFIED-RECON-SYNTHETIC",
+
+        "time_window":
+            "RECON-BEHAVIORAL-DEMO",
+
+        "recon_features": {
+
+            "unique_destination_hosts":
+                35.0,
+
+            "unique_destination_ports":
+                60.0,
+
+            "flow_count":
+                80.0,
+
+            "connection_attempts":
+                80.0,
+
+            "failed_connection_ratio":
+                0.65,
+
+            "short_flow_ratio":
+                0.82,
+
+            "port_fanout":
+                1.7,
+
+            "host_fanout":
+                0.4375,
+
+            "fanout_change":
+                8.5,
+
+            "destination_concentration":
+                0.10,
+        },
+    }
+
+    try:
+
+        result = analyze_request(
+            DetectionRequest(
+                **payload
+            )
+        )
+
+    except Exception as exc:
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Reconnaissance demo "
+                "failed: "
+                + str(exc)
+            ),
+        ) from exc
+
+    store_alert(
+        result
+    )
+
+    result[
+        "demo_source"
+    ] = (
+        "synthetic_recon_feature_replay"
+    )
+
+    result[
+        "demo_note"
+    ] = (
+        "Passive behavioral feature replay; "
+        "no network probes or packets transmitted."
+    )
+
+    return result
+
+
 # ============================================================
+# DATA EXFILTRATION DEMO
+#
+# Synthetic feature replay only.
+#
+# It demonstrates suspicious high-volume data-transfer
+# behavior using metadata features.
+#
+# It does NOT claim that actual data was exfiltrated.
+# ============================================================
+
+
+@app.post(
+    "/demo/exfil"
+)
+def run_exfil_demo():
+
+    payload = {
+
+        "source":
+            "VERIFIED-EXFIL-SYNTHETIC",
+
+        "time_window":
+            "EXFIL-BEHAVIORAL-DEMO",
+
+        "exfil_features": {
+
+            "flow_count":
+                5.0,
+
+            "total_bytes":
+                2_800_000.0,
+
+            "bytes_per_flow":
+                560_000.0,
+
+            "unique_destinations":
+                1.0,
+
+            "dominant_destination_bytes_ratio":
+                0.98,
+
+            "large_flow_ratio":
+                0.80,
+
+            "bytes_rate":
+                560_000.0,
+
+            "bytes_rate_change":
+                3.5,
+
+            "mean_duration":
+                25.0,
+
+            "p95_duration":
+                47.0,
+
+            "repeat_destination_ratio":
+                0.92,
+
+            "destination_entropy":
+                0.05,
+
+            "new_destination_rate":
+                0.0,
+        },
+    }
+
+    try:
+
+        result = analyze_request(
+            DetectionRequest(
+                **payload
+            )
+        )
+
+    except Exception as exc:
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Data exfiltration demo "
+                "failed: "
+                + str(exc)
+            ),
+        ) from exc
+
+    store_alert(
+        result
+    )
+
+    result[
+        "demo_source"
+    ] = (
+        "synthetic_exfil_feature_replay"
+    )
+
+    result[
+        "demo_note"
+    ] = (
+        "Metadata-based suspicious-transfer "
+        "demo; not proof of actual exfiltration."
+    )
+
+    return result
+
+
+# ============================================================
+# EXTENDED RECON + EXFIL REPLAY
+# ============================================================
+
+
+@app.post(
+    "/demo/run-extended"
+)
+def run_extended_demo():
+
+    results: Dict[
+        str,
+        Any,
+    ] = {}
+
+    # --------------------------------------------------------
+    # Reconnaissance
+    # --------------------------------------------------------
+
+    try:
+
+        results[
+            "recon"
+        ] = run_recon_demo()
+
+    except Exception as exc:
+
+        results[
+            "recon"
+        ] = {
+
+            "prediction":
+                "ERROR",
+
+            "error":
+                str(exc),
+        }
+
+    # --------------------------------------------------------
+    # Data Exfiltration
+    # --------------------------------------------------------
+
+    try:
+
+        results[
+            "exfil"
+        ] = run_exfil_demo()
+
+    except Exception as exc:
+
+        results[
+            "exfil"
+        ] = {
+
+            "prediction":
+                "ERROR",
+
+            "error":
+                str(exc),
+        }
+
+    return {
+
+        "scenarios_run":
+            2,
+
+        "results":
+            results,
+
+        "alert_count":
+            len(ALERTS),
+    }
+
+
+# ============================================================
+# RUN ALL DEMO SCENARIOS
+#
+# Existing verified scenarios are preserved.
+# The two new behavioral demos are added afterwards.
+# ============================================================
+
 
 @app.post(
     "/demo/run-all"
@@ -767,12 +1403,11 @@ def run_all_demo_scenarios():
 
     results: Dict[
         str,
-        Any
+        Any,
     ] = {}
 
-
     # --------------------------------------------------------
-    # DNS / C2 / ENCRYPTED / CORRELATED
+    # Existing verified scenarios
     # --------------------------------------------------------
 
     for (
@@ -803,13 +1438,13 @@ def run_all_demo_scenarios():
             results[
                 scenario
             ] = {
+
                 "prediction":
                     "ERROR",
 
                 "error":
                     str(exc),
             }
-
 
     # --------------------------------------------------------
     # DDoS
@@ -830,6 +1465,7 @@ def run_all_demo_scenarios():
         results[
             "ddos"
         ] = {
+
             "prediction":
                 "ERROR",
 
@@ -837,6 +1473,59 @@ def run_all_demo_scenarios():
                 str(exc),
         }
 
+    # --------------------------------------------------------
+    # Reconnaissance
+    # --------------------------------------------------------
+
+    try:
+
+        recon_result = (
+            run_recon_demo()
+        )
+
+        results[
+            "recon"
+        ] = recon_result
+
+    except Exception as exc:
+
+        results[
+            "recon"
+        ] = {
+
+            "prediction":
+                "ERROR",
+
+            "error":
+                str(exc),
+        }
+
+    # --------------------------------------------------------
+    # Data Exfiltration
+    # --------------------------------------------------------
+
+    try:
+
+        exfil_result = (
+            run_exfil_demo()
+        )
+
+        results[
+            "exfil"
+        ] = exfil_result
+
+    except Exception as exc:
+
+        results[
+            "exfil"
+        ] = {
+
+            "prediction":
+                "ERROR",
+
+            "error":
+                str(exc),
+        }
 
     return {
 
@@ -854,9 +1543,10 @@ def run_all_demo_scenarios():
 # ============================================================
 # GENERIC DEMO SCENARIO
 #
-# IMPORTANT:
-# This MUST be AFTER the specific demo routes above.
+# Specific /demo/recon and /demo/exfil routes above must
+# remain before this dynamic route.
 # ============================================================
+
 
 @app.post(
     "/demo/{scenario}"
@@ -864,6 +1554,14 @@ def run_all_demo_scenarios():
 def run_demo_scenario(
     scenario: str,
 ):
+
+    if scenario == "recon":
+
+        return run_recon_demo()
+
+    if scenario == "exfil":
+
+        return run_exfil_demo()
 
     if (
         scenario
@@ -873,27 +1571,34 @@ def run_demo_scenario(
         raise HTTPException(
             status_code=404,
             detail={
+
                 "error":
                     "Unknown demo scenario",
 
-                "available":
-                    [
-                        "dns",
-                        "c2",
-                        "encrypted",
-                        "correlated",
-                        "ddos",
-                    ],
+                "available": [
+
+                    "dns",
+
+                    "c2",
+
+                    "encrypted",
+
+                    "correlated",
+
+                    "ddos",
+
+                    "recon",
+
+                    "exfil",
+                ],
             },
         )
-
 
     payload = (
         VERIFIED_SCENARIOS[
             scenario
         ]
     )
-
 
     try:
 
@@ -916,7 +1621,6 @@ def run_demo_scenario(
             ),
         ) from exc
 
-
     store_alert(
         result
     )
@@ -927,6 +1631,7 @@ def run_demo_scenario(
 # ============================================================
 # STATIC FILES
 # ============================================================
+
 
 app.mount(
     "/static",
@@ -942,6 +1647,7 @@ app.mount(
 # ============================================================
 # DASHBOARD
 # ============================================================
+
 
 @app.get(
     "/",

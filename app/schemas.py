@@ -23,9 +23,16 @@ class DetectionRequest(BaseModel):
 
     encrypted_features: Optional[Dict[str, float]] = None
 
+    # --------------------------------------------------------
+    # EXTENDED SIH THREAT CATEGORIES
+    # --------------------------------------------------------
+
+    recon_features: Optional[Dict[str, float]] = None
+
+    exfil_features: Optional[Dict[str, float]] = None
+
 
 class DetectorResult(BaseModel):
-
     detector: str
 
     prediction: str
@@ -45,7 +52,6 @@ class DetectorResult(BaseModel):
 
 
 class UnifiedAlert(BaseModel):
-
     prediction: str
 
     severity: str

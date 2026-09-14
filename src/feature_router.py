@@ -1,20 +1,30 @@
 """
 CODEZILLA FEATURE ROUTER
 
-Routes a unified traffic/window DataFrame to the feature
-schemas required by individual detectors.
+Central feature-routing utilities for the six supported
+threat categories:
 
-This module does not perform detection itself.
+    1. DDoS
+    2. C2
+    3. DNS
+    4. ENCRYPTED_TRAFFIC
+    5. RECONNAISSANCE
+    6. DATA_EXFILTRATION
+
+The router does not perform packet capture and does not
+modify traffic. It only selects/normalizes already-observed
+feature columns for the relevant detector.
 """
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Any, Dict, List
+
 import pandas as pd
 
 
 # ============================================================
-# FEATURE SCHEMAS
+# DNS FEATURES
 # ============================================================
 
 DNS_FEATURES = [
@@ -35,6 +45,10 @@ DNS_FEATURES = [
 ]
 
 
+# ============================================================
+# ENCRYPTED TRAFFIC FEATURES
+# ============================================================
+
 ENCRYPTED_FEATURES = [
     "encrypted_flow_count",
     "encrypted_total_packets",
@@ -50,96 +64,207 @@ ENCRYPTED_FEATURES = [
 ]
 
 
-def get_available_features(
-    dataframe: pd.DataFrame,
-    required_features: List[str],
-) -> List[str]:
+# ============================================================
+# RECONNAISSANCE FEATURES
+# ============================================================
+
+RECON_FEATURES = [
+    "unique_destination_hosts",
+    "unique_destination_ports",
+    "flow_count",
+    "connection_attempts",
+    "failed_connection_ratio",
+    "short_flow_ratio",
+    "port_fanout",
+    "host_fanout",
+    "fanout_change",
+    "destination_concentration",
+]
+
+
+# ============================================================
+# DATA EXFILTRATION FEATURES
+# ============================================================
+
+EXFIL_FEATURES = [
+    "flow_count",
+    "total_bytes",
+    "bytes_per_flow",
+    "unique_destinations",
+    "dominant_destination_bytes_ratio",
+    "large_flow_ratio",
+    "bytes_rate",
+    "bytes_rate_change",
+    "mean_duration",
+    "p95_duration",
+    "repeat_destination_ratio",
+    "destination_entropy",
+    "new_destination_rate",
+]
+
+
+# ============================================================
+# INTERNAL HELPERS
+# ============================================================
+
+
+def _ensure_dataframe(
+    data: Any,
+) -> pd.DataFrame:
     """
-    Return the required features that actually exist.
+    Normalize input into a DataFrame.
+
+    Accepted inputs:
+        - pandas DataFrame
+        - dictionary representing one feature row
     """
 
-    return [
-        feature
-        for feature in required_features
-        if feature in dataframe.columns
-    ]
+    if isinstance(
+        data,
+        pd.DataFrame,
+    ):
 
+        return data.copy()
 
-def has_features(
-    dataframe: pd.DataFrame,
-    required_features: List[str],
-) -> bool:
-    """
-    Check whether all required features are available.
-    """
+    if isinstance(
+        data,
+        dict,
+    ):
 
-    return all(
-        feature in dataframe.columns
-        for feature in required_features
+        return pd.DataFrame(
+            [data]
+        )
+
+    raise TypeError(
+        "Expected pandas DataFrame or feature dictionary."
     )
 
 
-def route_dns(
-    dataframe: pd.DataFrame,
+def _select_features(
+    data: Any,
+    features: List[str],
 ) -> pd.DataFrame:
     """
-    Return DNS model features if available.
+    Select known detector features while preserving
+    row count.
+
+    Missing feature columns are filled with zeros.
     """
 
-    missing = [
-        feature
-        for feature in DNS_FEATURES
-        if feature not in dataframe.columns
-    ]
+    dataframe = _ensure_dataframe(
+        data
+    )
 
-    if missing:
-        raise ValueError(
-            "DNS features missing: "
-            + ", ".join(missing)
-        )
+    selected = dataframe.copy()
 
-    return dataframe[DNS_FEATURES].copy()
+    for feature in features:
 
+        if feature not in selected.columns:
 
-def route_encrypted(
-    dataframe: pd.DataFrame,
-) -> pd.DataFrame:
-    """
-    Return encrypted-traffic model features if available.
-    """
+            selected[feature] = 0.0
 
-    missing = [
-        feature
-        for feature in ENCRYPTED_FEATURES
-        if feature not in dataframe.columns
-    ]
-
-    if missing:
-        raise ValueError(
-            "Encrypted features missing: "
-            + ", ".join(missing)
-        )
-
-    return dataframe[
-        ENCRYPTED_FEATURES
+    return selected[
+        features
     ].copy()
 
 
-def describe_features(
-    dataframe: pd.DataFrame,
-) -> Dict[str, List[str]]:
+# ============================================================
+# DNS ROUTER
+# ============================================================
+
+
+def route_dns(
+    data: Any,
+) -> pd.DataFrame:
     """
-    Describe which detector schemas can be satisfied.
+    Prepare DNS features for the DNS detector.
+    """
+
+    return _select_features(
+        data,
+        DNS_FEATURES,
+    )
+
+
+# ============================================================
+# ENCRYPTED TRAFFIC ROUTER
+# ============================================================
+
+
+def route_encrypted(
+    data: Any,
+) -> pd.DataFrame:
+    """
+    Prepare encrypted-traffic metadata features.
+    """
+
+    return _select_features(
+        data,
+        ENCRYPTED_FEATURES,
+    )
+
+
+# ============================================================
+# RECONNAISSANCE ROUTER
+# ============================================================
+
+
+def route_recon(
+    data: Any,
+) -> pd.DataFrame:
+    """
+    Prepare reconnaissance behavioral features.
+    """
+
+    return _select_features(
+        data,
+        RECON_FEATURES,
+    )
+
+
+# ============================================================
+# DATA EXFILTRATION ROUTER
+# ============================================================
+
+
+def route_exfil(
+    data: Any,
+) -> pd.DataFrame:
+    """
+    Prepare suspicious data-transfer features.
+    """
+
+    return _select_features(
+        data,
+        EXFIL_FEATURES,
+    )
+
+
+# ============================================================
+# FEATURE DESCRIPTION
+# ============================================================
+
+
+def describe_features() -> Dict[str, List[str]]:
+    """
+    Return the feature schema exposed by each routed
+    detector family.
     """
 
     return {
-        "DNS": get_available_features(
-            dataframe,
-            DNS_FEATURES,
+        "DNS": list(
+            DNS_FEATURES
         ),
 
-        "ENCRYPTED_TRAFFIC": get_available_features(
-            dataframe,
-            ENCRYPTED_FEATURES,
+        "ENCRYPTED_TRAFFIC": list(
+            ENCRYPTED_FEATURES
+        ),
+
+        "RECONNAISSANCE": list(
+            RECON_FEATURES
+        ),
+
+        "DATA_EXFILTRATION": list(
+            EXFIL_FEATURES
         ),
     }
