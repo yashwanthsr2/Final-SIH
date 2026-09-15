@@ -88,3 +88,13 @@ def serve_root():
     if index_path.exists():
         return FileResponse(str(index_path))
     return {"status": "ok", "message": "CyberSentinel Backend Active"}
+
+@app.get("/judge", include_in_schema=False)
+def serve_judge():
+    judge_path = static_dir / "judge.html"
+    if judge_path.exists():
+        return FileResponse(str(judge_path))
+    legacy_path = LEGACY_STATIC_DIR / "judge.html"
+    if legacy_path.exists():
+        return FileResponse(str(legacy_path))
+    return {"status": "error", "message": "judge.html not found"}
