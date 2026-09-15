@@ -1,0 +1,271 @@
+{
+  "metadata": {
+    "timestamp": "2026-09-15 05:13:07 UTC",
+    "platform": "win32",
+    "python_version": "3.14.0"
+  },
+  "ingestion": {
+    "mean_ms": 0.0058,
+    "median_ms": 0.0062,
+    "p95_ms": 0.008,
+    "p99_ms": 0.009,
+    "min_ms": 0.0035,
+    "max_ms": 0.0733,
+    "stdev_ms": 0.0027,
+    "samples": 1000,
+    "mean_us": 5.84,
+    "median_us": 6.2,
+    "p95_us": 8.0,
+    "throughput_flows_per_sec": 166469.7
+  },
+  "feature_extraction": {
+    "mean_ms": 0.3319,
+    "median_ms": 0.3268,
+    "p95_ms": 0.3711,
+    "p99_ms": 0.4113,
+    "min_ms": 0.3011,
+    "max_ms": 0.4254,
+    "stdev_ms": 0.0238,
+    "samples": 40,
+    "window_size_flows": 25,
+    "windows_per_sec": 3013.0,
+    "effective_flows_per_sec": 75325.0
+  },
+  "detectors": {
+    "DDoS": {
+      "mean_ms": 4.1288,
+      "median_ms": 4.1971,
+      "p95_ms": 4.9696,
+      "p99_ms": 5.6651,
+      "min_ms": 2.7229,
+      "max_ms": 6.6949,
+      "stdev_ms": 0.6073,
+      "samples": 100,
+      "evals_per_sec": 242.2
+    },
+    "C2": {
+      "mean_ms": 1.1836,
+      "median_ms": 1.2628,
+      "p95_ms": 1.448,
+      "p99_ms": 1.6003,
+      "min_ms": 0.9063,
+      "max_ms": 1.6084,
+      "stdev_ms": 0.2028,
+      "samples": 100,
+      "evals_per_sec": 844.9
+    },
+    "DNS": {
+      "mean_ms": 2.328,
+      "median_ms": 2.3245,
+      "p95_ms": 3.1374,
+      "p99_ms": 3.5201,
+      "min_ms": 1.6447,
+      "max_ms": 3.5282,
+      "stdev_ms": 0.4053,
+      "samples": 100,
+      "evals_per_sec": 429.6
+    },
+    "ENCRYPTED_TRAFFIC": {
+      "mean_ms": 4.3262,
+      "median_ms": 4.2616,
+      "p95_ms": 6.666,
+      "p99_ms": 7.3058,
+      "min_ms": 3.2085,
+      "max_ms": 7.5376,
+      "stdev_ms": 0.8786,
+      "samples": 100,
+      "evals_per_sec": 231.1
+    },
+    "RECON": {
+      "mean_ms": 0.1499,
+      "median_ms": 0.16,
+      "p95_ms": 0.1774,
+      "p99_ms": 0.2642,
+      "min_ms": 0.1115,
+      "max_ms": 0.4319,
+      "stdev_ms": 0.0404,
+      "samples": 100,
+      "evals_per_sec": 6671.1
+    },
+    "EXFILTRATION": {
+      "mean_ms": 0.117,
+      "median_ms": 0.1161,
+      "p95_ms": 0.1241,
+      "p99_ms": 0.1405,
+      "min_ms": 0.1117,
+      "max_ms": 0.1461,
+      "stdev_ms": 0.0048,
+      "samples": 100,
+      "evals_per_sec": 8547.0
+    }
+  },
+  "ml_inference": {
+    "dos_hgb": {
+      "mean_ms": 4.4615,
+      "median_ms": 4.4374,
+      "p95_ms": 5.6803,
+      "p99_ms": 6.6995,
+      "min_ms": 2.7446,
+      "max_ms": 6.8872,
+      "stdev_ms": 0.8585,
+      "samples": 100,
+      "inferences_per_sec": 224.1
+    },
+    "c2_hgb": {
+      "mean_ms": 2.7751,
+      "median_ms": 2.5433,
+      "p95_ms": 3.4467,
+      "p99_ms": 4.7181,
+      "min_ms": 1.7467,
+      "max_ms": 13.9238,
+      "stdev_ms": 1.2229,
+      "samples": 100,
+      "inferences_per_sec": 360.3
+    },
+    "dns_hgb": {
+      "mean_ms": 4.211,
+      "median_ms": 4.1624,
+      "p95_ms": 4.901,
+      "p99_ms": 6.4218,
+      "min_ms": 2.8366,
+      "max_ms": 6.7626,
+      "stdev_ms": 0.6535,
+      "samples": 100,
+      "inferences_per_sec": 237.5
+    },
+    "encrypted_hgb": {
+      "mean_ms": 1.5903,
+      "median_ms": 1.5481,
+      "p95_ms": 1.9896,
+      "p99_ms": 2.4596,
+      "min_ms": 1.1741,
+      "max_ms": 2.6115,
+      "stdev_ms": 0.238,
+      "samples": 100,
+      "inferences_per_sec": 628.8
+    }
+  },
+  "correlation": {
+    "mean_ms": 0.0081,
+    "median_ms": 0.0081,
+    "p95_ms": 0.0095,
+    "p99_ms": 0.013,
+    "min_ms": 0.0059,
+    "max_ms": 0.0173,
+    "stdev_ms": 0.0012,
+    "samples": 500,
+    "mean_us": 8.14,
+    "p95_us": 9.5,
+    "correlations_per_sec": 122850.1
+  },
+  "trajectory_prediction": {
+    "mean_ms": 0.0163,
+    "median_ms": 0.0142,
+    "p95_ms": 0.0203,
+    "p99_ms": 0.0281,
+    "min_ms": 0.0125,
+    "max_ms": 0.2134,
+    "stdev_ms": 0.0095,
+    "samples": 500,
+    "mean_us": 16.27,
+    "p95_us": 20.31,
+    "predictions_per_sec": 61462.8
+  },
+  "end_to_end_alert": {
+    "mean_ms": 17.652,
+    "median_ms": 17.2289,
+    "p95_ms": 20.893,
+    "p99_ms": 21.5928,
+    "min_ms": 13.6938,
+    "max_ms": 21.6136,
+    "stdev_ms": 2.1463,
+    "samples": 50,
+    "throughput_alerts_per_sec": 56.5
+  },
+  "dashboard_endpoints": {
+    "/api/alerts?limit=50": {
+      "mean_ms": 31.4966,
+      "median_ms": 30.1112,
+      "p95_ms": 61.9939,
+      "p99_ms": 105.6281,
+      "min_ms": 15.7685,
+      "max_ms": 116.5366,
+      "stdev_ms": 23.0258,
+      "samples": 20,
+      "requests_per_sec": 31.7
+    },
+    "/api/metrics": {
+      "mean_ms": 11.8233,
+      "median_ms": 15.1395,
+      "p95_ms": 17.3564,
+      "p99_ms": 25.1797,
+      "min_ms": 1.1249,
+      "max_ms": 27.1355,
+      "stdev_ms": 7.5255,
+      "samples": 20,
+      "requests_per_sec": 84.6
+    },
+    "/api/network": {
+      "mean_ms": 8.7625,
+      "median_ms": 7.0432,
+      "p95_ms": 17.0487,
+      "p99_ms": 23.8813,
+      "min_ms": 1.3221,
+      "max_ms": 25.5895,
+      "stdev_ms": 7.8694,
+      "samples": 20,
+      "requests_per_sec": 114.1
+    },
+    "/api/threat-summary": {
+      "mean_ms": 13.2887,
+      "median_ms": 15.2464,
+      "p95_ms": 25.0404,
+      "p99_ms": 27.7271,
+      "min_ms": 3.3336,
+      "max_ms": 28.3988,
+      "stdev_ms": 8.0831,
+      "samples": 20,
+      "requests_per_sec": 75.3
+    },
+    "/api/timeline?hours=24": {
+      "mean_ms": 8.5311,
+      "median_ms": 2.1866,
+      "p95_ms": 25.043,
+      "p99_ms": 25.3512,
+      "min_ms": 1.5016,
+      "max_ms": 25.4283,
+      "stdev_ms": 8.9964,
+      "samples": 20,
+      "requests_per_sec": 117.2
+    },
+    "/api/trajectory": {
+      "mean_ms": 5.433,
+      "median_ms": 1.3343,
+      "p95_ms": 15.912,
+      "p99_ms": 21.9142,
+      "min_ms": 1.0758,
+      "max_ms": 23.4147,
+      "stdev_ms": 6.8865,
+      "samples": 20,
+      "requests_per_sec": 184.1
+    },
+    "/health": {
+      "mean_ms": 7.2388,
+      "median_ms": 1.342,
+      "p95_ms": 16.227,
+      "p99_ms": 24.5294,
+      "min_ms": 1.0244,
+      "max_ms": 26.605,
+      "stdev_ms": 7.9974,
+      "samples": 20,
+      "requests_per_sec": 138.1
+    }
+  },
+  "memory": {
+    "benchmark_runner_rss_mb": 188.33,
+    "benchmark_runner_vms_mb": 1107.15,
+    "uvicorn_server_rss_mb": 67.8,
+    "uvicorn_server_pid": 27780,
+    "total_active_memory_mb": 256.13
+  }
+}

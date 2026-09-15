@@ -1,0 +1,11 @@
+{
+  "label": "AFTER_TUNING_VERIFIED",
+  "duration_sec": 11.51,
+  "total_web_bytes": 5444224,
+  "delta_pkts": 3965,
+  "delta_bytes": 7196432,
+  "delta_flows": 176,
+  "new_alert_count": 0,
+  "alerts_by_threat": {},
+  "new_alerts": []
+}

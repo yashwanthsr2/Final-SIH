@@ -1,0 +1,26 @@
+# CyberSentinel Real-Time Passive Wi-Fi Monitoring Configuration
+environment: live-monitoring
+app:
+  name: CyberSentinel-Sensor
+  version: 1.2.0
+  model_version: v1.0
+  debug: false
+  host: 127.0.0.1
+  port: 8000
+
+sensor:
+  interface: "${LIVE_INTERFACE:-wlan0}"
+  backend_url: "${CYBERSENTINEL_BACKEND:-http://127.0.0.1:8000}"
+  engine: "zeek"
+  fallback_engine: "scapy"
+  window_seconds: 5
+  promiscuous: true
+  read_only: true
+  strictly_passive: true
+  zero_packet_injection: true
+  zero_payload_decryption: true
+
+baseline:
+  auto_learn: true
+  learning_duration_seconds: 60
+  suppress_known_streaming: true

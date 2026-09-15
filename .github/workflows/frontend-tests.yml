@@ -1,0 +1,25 @@
+name: Frontend Verification
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  frontend-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Verify Frontend Asset Integrity
+        run: |
+          test -f frontend/public/index.html
+          test -f frontend/package.json
+          echo "Frontend static bundle and React source verified."

@@ -1,0 +1,26 @@
+{
+  "source": "147.32.84.165",
+  "destination": "198.51.100.24",
+  "time_window": "2011-08-10T15:13:40",
+  "c2_features": {
+    "flow_count": 595.0,
+    "unique_destinations": 73.0,
+    "unique_ports": 34.0,
+    "total_packets": 8337.0,
+    "total_bytes": 4494266.0,
+    "mean_packets": 14.011765,
+    "mean_bytes": 7553.388235,
+    "mean_duration": 356.795946,
+    "max_destination_count": 223.0,
+    "destination_concentration": 0.37479,
+    "iat_mean": 9.602416,
+    "iat_std": 80.3288,
+    "iat_median": 0.009076,
+    "iat_min": 4e-06,
+    "iat_max": 1489.884621,
+    "iat_cv": 8.365478,
+    "max_pair_repetition": 215.0,
+    "pair_repetition_ratio": 0.361345,
+    "destination_entropy": 2.784545
+  }
+}

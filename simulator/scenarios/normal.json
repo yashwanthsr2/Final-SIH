@@ -1,0 +1,11 @@
+{
+  "source": "192.168.1.55",
+  "destination": "142.250.190.46",
+  "domain": "www.google.com",
+  "time_window": "2026-09-13T12:00:00",
+  "recon_features": {
+    "flow_count": 1,
+    "unique_dst_ports": 1,
+    "total_bytes": 1200
+  }
+}

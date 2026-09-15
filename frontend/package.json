@@ -1,0 +1,25 @@
+{
+  "name": "cybersentinel-frontend",
+  "version": "1.2.0",
+  "private": true,
+  "description": "CyberSentinel UI - SIH26-26145",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "chart.js": "^4.4.4",
+    "d3": "^7.9.0",
+    "lucide-react": "^0.441.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@types/d3": "^7.4.3",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.3"
+  }
+}

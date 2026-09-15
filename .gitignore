@@ -1,16 +1,110 @@
-﻿.venv/
-.venv312/
+# ============================================================
+# CyberSentinel Git Ignore Rules — SIH26-26145
+# ============================================================
+
+# --- Python ---
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+*.manifest
+*.spec
+
+# --- Virtual Environments ---
+.venv/
+.venv*/
+venv/
+ENV/
+env/
+
+# --- Environment Variables, Keys & Secrets ---
 .env
-*.zip
-.pytest_cache/
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.crt
+id_rsa*
+id_ed25519*
+secrets/
+*.pfx
+*.p12
+
+# --- Databases & Runtime Persistence ---
+db/*.db
+db/*.db-shm
+db/*.db-wal
+*.sqlite
+*.sqlite3
+!db/.gitkeep
+
+# --- IDEs, Editors & Operating System ---
 .vscode/
 .idea/
-data/raw/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# --- Testing, Linting & Coverage ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.ruff_cache/
+.mypy_cache/
+
+# --- Node.js & Frontend ---
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+package-lock.json
+
+# --- Large Datasets & Raw Packet Captures ---
+data/raw/*
+!data/raw/.gitkeep
 data/*.zip
-data/processed/detection_dos_cleaned.csv
-data/processed/train_dos.csv
-data/processed/test_dos.csv
-data/processed/validation_dos.csv
-data/processed/valid_dos.csv
+data/*.tar.gz
+data/*.7z
+zeek_logs/
+*.pcap
+*.pcapng
+*.cap
+!data/sample/*.pcap
+
+# --- Build, Docker & Caches ---
+.docker/
+docker-build/
+
+# --- Logs, Dumps & Scratch Scripts ---
+*.log
+scratch/
+tmp/
+temp/
+project_tree.txt
+code_review_bundle.txt
+backup_*/
+*.bak

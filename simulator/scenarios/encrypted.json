@@ -1,0 +1,20 @@
+{
+  "source": "147.32.84.165",
+  "destination": "185.220.101.5",
+  "time_window": "2011-08-10T11:07:00",
+  "encrypted_features": {
+    "encrypted_flow_count": 1.0,
+    "encrypted_total_packets": 7.0,
+    "encrypted_total_bytes": 558.0,
+    "encrypted_unique_destinations": 1.0,
+    "encrypted_unique_ports": 1.0,
+    "encrypted_mean_duration": 9.560554,
+    "bytes_per_flow": 558.0,
+    "packets_per_flow": 7.0,
+    "flow_count_prev": 1.0,
+    "flow_count_change": 0.0,
+    "bytes_prev": 366.0,
+    "bytes_change": 192.0,
+    "destination_change": 0.0
+  }
+}

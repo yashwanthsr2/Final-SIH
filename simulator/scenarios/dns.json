@@ -1,0 +1,30 @@
+{
+  "source": "147.32.84.165",
+  "destination": "8.8.8.8",
+  "domain": "tunnel.apt29-data.net",
+  "time_window": "2011-08-10T13:33:00",
+  "dns_features": {
+    "dns_query_count": 2.0,
+    "dns_total_packets": 4.0,
+    "dns_total_bytes": 793.0,
+    "dns_unique_destinations": 1.0,
+    "dns_query_rate": 0.2,
+    "dns_max_destination_count": 2.0,
+    "dns_packet_concentration": 1.0,
+    "dns_max_destination_bytes": 793.0,
+    "dns_byte_concentration": 1.0,
+    "dns_iat_mean": 2.255544,
+    "dns_iat_std": 0.0,
+    "dns_iat_median": 2.255544,
+    "dns_iat_cv": 0.0,
+    "query_rate_prev": 0.0,
+    "query_rate_roll3": 0.2,
+    "query_rate_roll6": 0.2,
+    "query_rate_std6": 0.0,
+    "query_rate_change": 0.0,
+    "query_rate_z6": 0.0,
+    "destination_change": 0.0,
+    "bytes_per_query": 396.5,
+    "packets_per_query": 2.0
+  }
+}

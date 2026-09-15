@@ -1,0 +1,39 @@
+{
+  "states": [
+    "NORMAL",
+    "RECON",
+    "C2",
+    "EXFILTRATION",
+    "SUSPICIOUS_ACTIVITY"
+  ],
+  "transitions": {
+    "NORMAL": {
+      "NORMAL": 0.85,
+      "RECON": 0.1,
+      "SUSPICIOUS_ACTIVITY": 0.05
+    },
+    "RECON": {
+      "RECON": 0.2,
+      "C2": 0.55,
+      "SUSPICIOUS_ACTIVITY": 0.15,
+      "NORMAL": 0.1
+    },
+    "C2": {
+      "C2": 0.25,
+      "EXFILTRATION": 0.6,
+      "SUSPICIOUS_ACTIVITY": 0.1,
+      "NORMAL": 0.05
+    },
+    "EXFILTRATION": {
+      "EXFILTRATION": 0.3,
+      "SUSPICIOUS_ACTIVITY": 0.5,
+      "NORMAL": 0.2
+    },
+    "SUSPICIOUS_ACTIVITY": {
+      "NORMAL": 0.4,
+      "RECON": 0.3,
+      "C2": 0.3
+    }
+  },
+  "version": "1.0.0"
+}

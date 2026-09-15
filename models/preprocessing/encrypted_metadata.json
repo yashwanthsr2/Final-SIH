@@ -1,0 +1,22 @@
+{
+  "model_name": "CODEZILLA-ENCRYPTED-HGB",
+  "model_type": "HistGradientBoostingClassifier",
+  "task": "Encrypted malware traffic detection (metadata-only)",
+  "feature_count": 13,
+  "decision_threshold": 0.9,
+  "training_date": "2026-09-13",
+  "dataset": "UWF-ZeekDataSum25 encrypted source features",
+  "training_time_sec": 0.1,
+  "final_test": {
+    "accuracy": 0.9966,
+    "precision": 0.2069,
+    "recall": 0.4,
+    "f1": 0.2727,
+    "roc_auc": 0.7296,
+    "fpr": 0.0024,
+    "n_test": 9502,
+    "n_positive": 15,
+    "threshold": 0.9
+  },
+  "sklearn_version": "1.7.2"
+}

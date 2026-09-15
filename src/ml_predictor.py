@@ -288,6 +288,22 @@ def predict(
                             ]
                         ),
                     })
+            else:
+                # Rank features by active signal strength
+                cand = []
+                for col in X.columns:
+                    try:
+                        val = float(row[col])
+                        cand.append((col, val, abs(val)))
+                    except (TypeError, ValueError):
+                        pass
+                cand.sort(key=lambda x: x[2], reverse=True)
+                for c_name, c_val, c_mag in cand[:max(1, top_k)]:
+                    supporting_features.append({
+                        "feature": c_name,
+                        "feature_value": c_val,
+                        "importance": c_mag,
+                    })
 
         results.append({
             "prediction": label,

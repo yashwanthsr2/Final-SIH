@@ -1,0 +1,11 @@
+{
+  "label": "INITIAL_RUN",
+  "duration_sec": 11.12,
+  "total_web_bytes": 5413554,
+  "delta_pkts": 3066,
+  "delta_bytes": 6025459,
+  "delta_flows": 123,
+  "new_alert_count": 0,
+  "alerts_by_threat": {},
+  "new_alerts": []
+}

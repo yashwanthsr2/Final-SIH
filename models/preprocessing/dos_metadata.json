@@ -1,0 +1,22 @@
+{
+  "model_name": "CODEZILLA-DOS-HGB",
+  "model_type": "HistGradientBoostingClassifier",
+  "task": "Temporal DDoS detection",
+  "feature_count": 62,
+  "decision_threshold": 0.8,
+  "training_date": "2026-09-13",
+  "dataset": "UWF-ZeekDataSum25 + processed parquet",
+  "training_time_sec": 2.2,
+  "final_test": {
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "roc_auc": 1.0,
+    "fpr": 0.0,
+    "n_test": 390,
+    "n_positive": 248,
+    "threshold": 0.8
+  },
+  "sklearn_version": "1.7.2"
+}

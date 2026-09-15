@@ -1,8 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
-if (-not (Test-Path '.\.venv312\Scripts\python.exe')) {
-    Write-Host 'ERROR: .venv312 was not found. Create/use a Python 3.12 environment first.' -ForegroundColor Red
-    exit 1
-}
+$pythonCmd = if (Test-Path '.\.venv312\Scripts\python.exe') { '.\.venv312\Scripts\python.exe' } else { 'python' }
 
-& .\.venv312\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+Write-Host "Starting CyberSentinel Unified SOC Platform on http://127.0.0.1:8000..." -ForegroundColor Cyan
+& $pythonCmd -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload
+

@@ -1,0 +1,17 @@
+{
+  "state": "ACTIVE",
+  "mean_byte_rate": 2500000.0,
+  "std_byte_rate": 0.0,
+  "max_byte_rate": 2500000.0,
+  "mean_packet_rate": 1800.0,
+  "std_packet_rate": 0.0,
+  "max_packet_rate": 1800.0,
+  "max_normal_ports": 15,
+  "max_normal_destinations": 15,
+  "known_destinations": [
+    "142.250.190.46",
+    "1.1.1.1",
+    "172.217.16.206"
+  ],
+  "completed_at": 1789456141.0014865
+}

@@ -1,0 +1,13 @@
+{
+  "source": "192.168.1.102",
+  "destination": "203.0.113.88",
+  "time_window": "2025-01-15T02:14:00",
+  "exfil_features": {
+    "bytes_out": 8500000,
+    "bytes_in": 1200,
+    "unique_destinations": 1,
+    "flow_count": 3,
+    "mean_flow_duration": 480.0,
+    "window_seconds": 600.0
+  }
+}

@@ -1,0 +1,170 @@
+{
+  "DDoS Detector": {
+    "test_samples": 390,
+    "positive_support": 248,
+    "negative_support": 142,
+    "decision_threshold": 0.8,
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "macro_f1": 1.0,
+    "weighted_f1": 1.0,
+    "roc_auc": 1.0,
+    "confusion_matrix": {
+      "TN": 142,
+      "FP": 0,
+      "FN": 0,
+      "TP": 248
+    },
+    "false_positives": 0,
+    "false_negatives": 0,
+    "false_positive_rate": 0.0,
+    "per_class_metrics": {
+      "class_0_benign": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 142
+      },
+      "class_1_threat": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 248
+      }
+    },
+    "inference_latency": {
+      "total_batch_ms": 2.69,
+      "per_sample_us": 6.9,
+      "per_sample_ms": 0.0069,
+      "throughput_samples_per_sec": 144932.9
+    }
+  },
+  "C2 Beaconing Detector": {
+    "test_samples": 604,
+    "positive_support": 117,
+    "negative_support": 487,
+    "decision_threshold": 0.3,
+    "accuracy": 0.7219,
+    "precision": 0.3241,
+    "recall": 0.4017,
+    "f1": 0.3588,
+    "macro_f1": 0.5906,
+    "weighted_f1": 0.7326,
+    "roc_auc": 0.7087,
+    "confusion_matrix": {
+      "TN": 389,
+      "FP": 98,
+      "FN": 70,
+      "TP": 47
+    },
+    "false_positives": 98,
+    "false_negatives": 70,
+    "false_positive_rate": 0.20123,
+    "per_class_metrics": {
+      "class_0_benign": {
+        "precision": 0.8475,
+        "recall": 0.7988,
+        "f1-score": 0.8224,
+        "support": 487
+      },
+      "class_1_threat": {
+        "precision": 0.3241,
+        "recall": 0.4017,
+        "f1-score": 0.3588,
+        "support": 117
+      }
+    },
+    "inference_latency": {
+      "total_batch_ms": 0.99,
+      "per_sample_us": 1.64,
+      "per_sample_ms": 0.0016,
+      "throughput_samples_per_sec": 610162.6
+    }
+  },
+  "DNS Threat Detector": {
+    "test_samples": 8191,
+    "positive_support": 169,
+    "negative_support": 8022,
+    "decision_threshold": 0.3,
+    "accuracy": 0.9943,
+    "precision": 0.9296,
+    "recall": 0.7811,
+    "f1": 0.8489,
+    "macro_f1": 0.923,
+    "weighted_f1": 0.994,
+    "roc_auc": 0.994,
+    "confusion_matrix": {
+      "TN": 8012,
+      "FP": 10,
+      "FN": 37,
+      "TP": 132
+    },
+    "false_positives": 10,
+    "false_negatives": 37,
+    "false_positive_rate": 0.00125,
+    "per_class_metrics": {
+      "class_0_benign": {
+        "precision": 0.9954,
+        "recall": 0.9988,
+        "f1-score": 0.9971,
+        "support": 8022
+      },
+      "class_1_threat": {
+        "precision": 0.9296,
+        "recall": 0.7811,
+        "f1-score": 0.8489,
+        "support": 169
+      }
+    },
+    "inference_latency": {
+      "total_batch_ms": 17.59,
+      "per_sample_us": 2.15,
+      "per_sample_ms": 0.0021,
+      "throughput_samples_per_sec": 465551.1
+    }
+  },
+  "Encrypted Traffic Anomaly Detector": {
+    "test_samples": 9502,
+    "positive_support": 15,
+    "negative_support": 9487,
+    "decision_threshold": 0.9,
+    "accuracy": 0.9966,
+    "precision": 0.2069,
+    "recall": 0.4,
+    "f1": 0.2727,
+    "macro_f1": 0.6355,
+    "weighted_f1": 0.9972,
+    "roc_auc": 0.7296,
+    "confusion_matrix": {
+      "TN": 9464,
+      "FP": 23,
+      "FN": 9,
+      "TP": 6
+    },
+    "false_positives": 23,
+    "false_negatives": 9,
+    "false_positive_rate": 0.00242,
+    "per_class_metrics": {
+      "class_0_benign": {
+        "precision": 0.999,
+        "recall": 0.9976,
+        "f1-score": 0.9983,
+        "support": 9487
+      },
+      "class_1_threat": {
+        "precision": 0.2069,
+        "recall": 0.4,
+        "f1-score": 0.2727,
+        "support": 15
+      }
+    },
+    "inference_latency": {
+      "total_batch_ms": 4.38,
+      "per_sample_us": 0.46,
+      "per_sample_ms": 0.0005,
+      "throughput_samples_per_sec": 2171587.9
+    }
+  }
+}

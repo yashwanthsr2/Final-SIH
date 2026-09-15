@@ -1,0 +1,38 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: cybersentinel-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - CYBERSENTINEL_ENV=production
+      - CYBERSENTINEL_HOST=0.0.0.0
+      - CYBERSENTINEL_PORT=8000
+      - PASSIVE_ONLY=true
+      - NO_PAYLOAD_DECRYPTION=true
+      - LIVE_INTERFACE=${LIVE_INTERFACE:-}
+    volumes:
+      - ./db:/app/db
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./configs:/app/configs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cybersentinel-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped

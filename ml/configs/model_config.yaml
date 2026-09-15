@@ -1,0 +1,17 @@
+models:
+  ddos:
+    type: HistGradientBoostingClassifier
+    file: dos_hgb.joblib
+    threshold: 0.50
+  c2:
+    type: RandomForestClassifier
+    file: c2_hgb.joblib
+    threshold: 0.30
+  dns:
+    type: RandomForestClassifier
+    file: dns_hgb.joblib
+    threshold: 0.50
+  encrypted:
+    type: RandomForestClassifier
+    file: encrypted_hgb.joblib
+    threshold: 0.35

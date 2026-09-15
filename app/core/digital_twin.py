@@ -1,0 +1,300 @@
+"""
+CyberSentinel Digital Twin.
+
+Maintains an in-memory lightweight graph of the observed network:
+- Nodes: IP addresses, domains, ports
+- Edges: observed communication flows
+
+Each node/edge carries a threat score updated by detectors.
+No external graph database required — uses plain Python dicts.
+
+Thread-safe for concurrent reads/writes from the FastAPI server.
+"""
+
+from __future__ import annotations
+
+import threading
+import time
+from collections import defaultdict, deque
+from typing import Any, Dict, List, Optional, Tuple
+
+from app.core.config import TWIN_MAX_NODES, TWIN_NODE_TTL
+
+
+# ============================================================
+# NODE TYPES
+# ============================================================
+
+NODE_TYPE_IP = "ip"
+NODE_TYPE_DOMAIN = "domain"
+NODE_TYPE_PORT = "port"
+
+
+# ============================================================
+# DIGITAL TWIN
+# ============================================================
+
+class DigitalTwin:
+    """
+    Lightweight in-memory network representation.
+
+    Each node has:
+        - id (str): unique identifier (IP, domain, or "port:N")
+        - node_type: ip / domain / port
+        - first_seen (float): Unix timestamp
+        - last_seen (float): Unix timestamp
+        - packets (int): total packets observed
+        - bytes (int): total bytes observed
+        - flow_count (int): distinct flows
+        - threat_score (float): 0.0–1.0, updated by detectors
+        - threat_classes (set): threat classes associated
+        - anomaly_score (float): 0.0–1.0
+        - tags (list): descriptive labels
+
+    Each edge (src → dst) has:
+        - packets, bytes, flow_count, last_seen, threat_score
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.RLock()
+        # nodes: id -> dict
+        self._nodes: Dict[str, Dict[str, Any]] = {}
+        # edges: (src_id, dst_id) -> dict
+        self._edges: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        # recent event log (for timeline widget)
+        self._events: deque = deque(maxlen=200)
+
+    # --------------------------------------------------------
+    # NODE OPERATIONS
+    # --------------------------------------------------------
+
+    def _ensure_node(self, node_id: str, node_type: str) -> Dict[str, Any]:
+        if node_id not in self._nodes:
+            self._nodes[node_id] = {
+                "id": node_id,
+                "node_type": node_type,
+                "first_seen": time.time(),
+                "last_seen": time.time(),
+                "packets": 0,
+                "bytes": 0,
+                "flow_count": 0,
+                "threat_score": 0.0,
+                "threat_classes": [],
+                "anomaly_score": 0.0,
+                "tags": [],
+            }
+        return self._nodes[node_id]
+
+    def update_from_flow(
+        self,
+        *,
+        src_ip: str,
+        dst_ip: Optional[str] = None,
+        domain: Optional[str] = None,
+        dst_port: Optional[int] = None,
+        packets: int = 0,
+        bytes_count: int = 0,
+        threat_score: float = 0.0,
+        threat_class: Optional[str] = None,
+    ) -> None:
+        """Update the twin from an observed flow."""
+        with self._lock:
+            now = time.time()
+
+            # Source IP node
+            src_node = self._ensure_node(src_ip, NODE_TYPE_IP)
+            src_node["last_seen"] = now
+            src_node["packets"] += packets
+            src_node["bytes"] += bytes_count
+            src_node["flow_count"] += 1
+            if threat_score > src_node["threat_score"]:
+                src_node["threat_score"] = threat_score
+            if threat_class and threat_class not in src_node["threat_classes"]:
+                src_node["threat_classes"].append(threat_class)
+
+            edge_target = None
+
+            # Destination IP node
+            if dst_ip:
+                dst_node = self._ensure_node(dst_ip, NODE_TYPE_IP)
+                dst_node["last_seen"] = now
+                dst_node["bytes"] += bytes_count
+                dst_node["flow_count"] += 1
+                edge_target = dst_ip
+
+            # Domain node
+            if domain:
+                dom_node = self._ensure_node(domain, NODE_TYPE_DOMAIN)
+                dom_node["last_seen"] = now
+                dom_node["flow_count"] += 1
+                if threat_score > dom_node["threat_score"]:
+                    dom_node["threat_score"] = threat_score
+                if threat_class and threat_class not in dom_node["threat_classes"]:
+                    dom_node["threat_classes"].append(threat_class)
+                edge_target = domain
+
+            # Port node
+            if dst_port:
+                port_id = f"port:{dst_port}"
+                port_node = self._ensure_node(port_id, NODE_TYPE_PORT)
+                port_node["last_seen"] = now
+                port_node["flow_count"] += 1
+
+            # Edge: src → target
+            if edge_target:
+                edge_key = (src_ip, edge_target)
+                if edge_key not in self._edges:
+                    self._edges[edge_key] = {
+                        "src": src_ip,
+                        "dst": edge_target,
+                        "packets": 0,
+                        "bytes": 0,
+                        "flow_count": 0,
+                        "last_seen": now,
+                        "threat_score": 0.0,
+                        "threat_class": None,
+                    }
+                edge = self._edges[edge_key]
+                edge["packets"] += packets
+                edge["bytes"] += bytes_count
+                edge["flow_count"] += 1
+                edge["last_seen"] = now
+                if threat_score > edge["threat_score"]:
+                    edge["threat_score"] = threat_score
+                    edge["threat_class"] = threat_class
+
+            # Evict stale nodes if over limit
+            self._evict_stale()
+
+    def update_threat_score(self, node_id: str, threat_score: float, threat_class: str) -> None:
+        """Update threat score on an existing node."""
+        with self._lock:
+            if node_id in self._nodes:
+                node = self._nodes[node_id]
+                if threat_score > node["threat_score"]:
+                    node["threat_score"] = threat_score
+                if threat_class and threat_class not in node["threat_classes"]:
+                    node["threat_classes"].append(threat_class)
+
+    def _evict_stale(self) -> None:
+        """Remove nodes that haven't been seen in TWIN_NODE_TTL seconds, or oldest if over limit."""
+        now = time.time()
+        stale_cutoff = now - TWIN_NODE_TTL
+
+        # Remove stale nodes
+        stale = [nid for nid, n in self._nodes.items() if n["last_seen"] < stale_cutoff]
+        for nid in stale:
+            self._nodes.pop(nid, None)
+
+        # Remove edges whose endpoints no longer exist
+        stale_edges = [k for k in self._edges if k[0] not in self._nodes or k[1] not in self._nodes]
+        for k in stale_edges:
+            self._edges.pop(k, None)
+
+        # Hard cap on node count
+        if len(self._nodes) > TWIN_MAX_NODES:
+            sorted_nodes = sorted(self._nodes.items(), key=lambda x: x[1]["last_seen"])
+            to_remove = len(self._nodes) - TWIN_MAX_NODES
+            for nid, _ in sorted_nodes[:to_remove]:
+                self._nodes.pop(nid, None)
+
+    # --------------------------------------------------------
+    # GRAPH EXPORT (for frontend)
+    # --------------------------------------------------------
+
+    def get_graph(
+        self,
+        include_ports: bool = False,
+        min_threat_score: float = 0.0,
+        limit_nodes: int = 150,
+    ) -> Dict[str, Any]:
+        """
+        Export the current graph state for the frontend visualisation.
+
+        Returns a dict with 'nodes' and 'edges' lists.
+        """
+        with self._lock:
+            nodes = []
+            for node in self._nodes.values():
+                if node["node_type"] == NODE_TYPE_PORT and not include_ports:
+                    continue
+                if node["threat_score"] < min_threat_score and min_threat_score > 0:
+                    continue
+                nodes.append({
+                    "id": node["id"],
+                    "type": node["node_type"],
+                    "threat_score": round(node["threat_score"], 3),
+                    "threat_classes": node["threat_classes"],
+                    "flow_count": node["flow_count"],
+                    "bytes": node["bytes"],
+                    "last_seen": node["last_seen"],
+                    "is_suspicious": node["threat_score"] >= 0.5,
+                })
+
+            # Limit to most-suspicious nodes
+            nodes.sort(key=lambda n: n["threat_score"], reverse=True)
+            nodes = nodes[:limit_nodes]
+
+            node_ids = {n["id"] for n in nodes}
+
+            edges = []
+            for edge in self._edges.values():
+                if edge["src"] not in node_ids or edge["dst"] not in node_ids:
+                    continue
+                edges.append({
+                    "src": edge["src"],
+                    "dst": edge["dst"],
+                    "flow_count": edge["flow_count"],
+                    "bytes": edge["bytes"],
+                    "threat_score": round(edge["threat_score"], 3),
+                    "threat_class": edge["threat_class"],
+                    "is_suspicious": edge["threat_score"] >= 0.5,
+                })
+
+            return {
+                "node_count": len(nodes),
+                "edge_count": len(edges),
+                "nodes": nodes,
+                "edges": edges,
+                "last_updated": time.time(),
+            }
+
+    def get_node(self, node_id: str) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            return dict(self._nodes.get(node_id, {}))
+
+    def get_stats(self) -> Dict[str, Any]:
+        with self._lock:
+            suspicious_nodes = sum(
+                1 for n in self._nodes.values() if n["threat_score"] >= 0.5
+            )
+            return {
+                "total_nodes": len(self._nodes),
+                "total_edges": len(self._edges),
+                "suspicious_nodes": suspicious_nodes,
+                "ip_nodes": sum(1 for n in self._nodes.values() if n["node_type"] == NODE_TYPE_IP),
+                "domain_nodes": sum(1 for n in self._nodes.values() if n["node_type"] == NODE_TYPE_DOMAIN),
+            }
+
+    def clear(self) -> None:
+        with self._lock:
+            self._nodes.clear()
+            self._edges.clear()
+            self._events.clear()
+
+
+# ============================================================
+# SINGLETON
+# ============================================================
+
+_twin: Optional[DigitalTwin] = None
+_twin_lock = threading.Lock()
+
+
+def get_twin() -> DigitalTwin:
+    global _twin
+    if _twin is None:
+        with _twin_lock:
+            if _twin is None:
+                _twin = DigitalTwin()
+    return _twin

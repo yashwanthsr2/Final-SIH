@@ -1,0 +1,14 @@
+{
+  "source": "10.0.0.45",
+  "destination": "10.0.0.1",
+  "time_window": "2025-01-15T09:22:00",
+  "recon_features": {
+    "unique_dst_ports": 48,
+    "unique_destinations": 12,
+    "flow_count": 320,
+    "window_seconds": 60.0,
+    "total_bytes": 14400,
+    "mean_syn_count": 0.85,
+    "total_packets": 320
+  }
+}

@@ -1,0 +1,29 @@
+# CyberSentinel Production Configuration
+environment: production
+app:
+  name: CyberSentinel
+  version: 1.2.0
+  model_version: v1.0
+  debug: false
+  host: 0.0.0.0
+  port: 8000
+  cors_origins:
+    - "*"
+
+database:
+  path: "db/cybersentinel.db"
+  max_alerts: 100000
+
+models:
+  classifier_dir: "models/classifier"
+  anomaly_dir: "models/anomaly"
+  trajectory_dir: "models/trajectory"
+  preprocessing_dir: "models/preprocessing"
+
+passive_monitoring:
+  enabled: true
+  passive_only: true
+  no_payload_decryption: true
+  interface: "${LIVE_INTERFACE}"
+  default_window_seconds: 5
+  baseline_auto_calibrate: true
