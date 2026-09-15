@@ -9,9 +9,9 @@
   "max_normal_ports": 15,
   "max_normal_destinations": 15,
   "known_destinations": [
-    "142.250.190.46",
     "1.1.1.1",
-    "172.217.16.206"
+    "172.217.16.206",
+    "142.250.190.46"
   ],
-  "completed_at": 1789456141.0014865
+  "completed_at": 1789461535.259008
 }
