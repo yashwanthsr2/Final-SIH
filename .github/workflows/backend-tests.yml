@@ -30,4 +30,7 @@ jobs:
         run: |
           python tests/integration/test_six_detectors.py
           python tests/integration/test_integration.py
+          python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 &
+          sleep 4
           python tests/e2e/test_e2e.py
+

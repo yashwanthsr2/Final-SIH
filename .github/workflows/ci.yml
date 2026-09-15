@@ -18,7 +18,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
       - name: Install Linting Tools
         run: |
@@ -30,6 +29,8 @@ jobs:
           flake8 backend ml tests --count --select=E9,F63,F7,F82 --show-source --statistics
 
       - name: Verify Passive Compliance & Security
+        env:
+          PYTHONPATH: .
         run: |
           python tests/unit/test_security_audit.py
 
@@ -45,7 +46,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
       - name: Install System & Python Dependencies
         run: |
@@ -71,6 +71,8 @@ jobs:
         env:
           PYTHONPATH: .
         run: |
+          python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 &
+          sleep 4
           python tests/e2e/test_all_apis.py
 
   docker-verification:
@@ -87,3 +89,4 @@ jobs:
       - name: Build Backend & Frontend Docker Images
         run: |
           docker compose build
+
