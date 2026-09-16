@@ -252,7 +252,10 @@ def live_start(body: Optional[LiveStartBody] = None, interface: Optional[str] = 
     live_srv = get_live_service()
     target = (body.interface if body else None) or interface or "Wi-Fi"
     clean_target = _validate_interface(target)
-    return live_srv.start(interface=clean_target)
+    res = live_srv.start(interface=clean_target)
+    if isinstance(res, dict):
+        res["status"] = "started" if res.get("running") else "error"
+    return res
 
 
 @router.post("/api/live/stop")

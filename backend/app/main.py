@@ -35,6 +35,7 @@ from backend.app.api import (
     trajectory_router,
     models_router,
     replay_router,
+    scanner_router,
     websocket_router,
 )
 
@@ -72,6 +73,7 @@ app.include_router(network_router)
 app.include_router(trajectory_router)
 app.include_router(models_router)
 app.include_router(replay_router)
+app.include_router(scanner_router)
 app.include_router(websocket_router)
 
 # Mount Frontend static files

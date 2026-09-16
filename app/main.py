@@ -130,6 +130,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from backend.app.api.scanner import router as scanner_router
+app.include_router(scanner_router)
+
 # ============================================================
 # LIVE MONITOR SETUP
 # ============================================================
@@ -558,7 +561,10 @@ def live_start(body: Optional[LiveStartBody] = None, interface: Optional[str] = 
     if LIVE_MONITOR is None:
         return {"status": "unavailable", "reason": "Monitor engine unavailable"}
     target = (body.interface if body else None) or interface or "Wi-Fi"
-    return LIVE_MONITOR.start(interface=target)
+    res = LIVE_MONITOR.start(interface=target)
+    if isinstance(res, dict):
+        res["status"] = "started" if res.get("running") else "error"
+    return res
 
 
 @app.post("/live/stop")

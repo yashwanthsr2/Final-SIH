@@ -1,11 +1,1117 @@
 {
   "label": "INITIAL_RUN",
-  "duration_sec": 11.12,
-  "total_web_bytes": 5413554,
-  "delta_pkts": 3066,
-  "delta_bytes": 6025459,
-  "delta_flows": 123,
-  "new_alert_count": 0,
-  "alerts_by_threat": {},
-  "new_alerts": []
+  "duration_sec": 9.66,
+  "total_web_bytes": 5334524,
+  "delta_pkts": 11259,
+  "delta_bytes": 15285820,
+  "delta_flows": 488,
+  "new_alert_count": 4,
+  "alerts_by_threat": {
+    "RECON": 4
+  },
+  "new_alerts": [
+    {
+      "id": "e52d8646-707b-4904-a722-1b5b2fee6937",
+      "timestamp": 1789497884.0843275,
+      "flow_id": "flow_192.168.0.114_189.156.249.205_59812_17123_1789497881.0843275",
+      "source": "192.168.0.114",
+      "destination": "104.16.249.249",
+      "protocol": "TCP",
+      "threat_class": "RECON",
+      "confidence": 0.75,
+      "risk_score": 72,
+      "severity": "HIGH",
+      "current_state": "EXFILTRATION",
+      "predicted_next_state": "EXFILTRATION",
+      "prediction_confidence": 0.595,
+      "model_version": "v1.0",
+      "correlation_id": null,
+      "evidence": [
+        {
+          "feature": "unique_dst_ports",
+          "value": 75.0,
+          "contribution": 0.3,
+          "direction": "increases_risk",
+          "human_label": "High destination port diversity (75 unique ports)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "unique_dst_ips",
+          "value": 120.0,
+          "contribution": 0.25,
+          "direction": "increases_risk",
+          "human_label": "High destination IP fan-out (120 unique hosts \u2014 horizontal scan)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "flow_rate",
+          "value": 44.0,
+          "contribution": 0.2,
+          "direction": "increases_risk",
+          "human_label": "Elevated connection attempt rate (44.00 flows/sec)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "bytes_out",
+          "value": 2239359,
+          "contribution": 0.194,
+          "direction": "increases_risk",
+          "human_label": "Large outbound transfer (2.2 MB)",
+          "threat_class": "EXFILTRATION"
+        },
+        {
+          "feature": "outbound_ratio",
+          "value": 29.13,
+          "contribution": 0.25,
+          "direction": "increases_risk",
+          "human_label": "Asymmetric traffic: 29.1\u00d7 more outbound than inbound",
+          "threat_class": "EXFILTRATION"
+        },
+        {
+          "feature": "bytes_per_sec",
+          "value": 746453.0,
+          "contribution": 0.1,
+          "direction": "increases_risk",
+          "human_label": "High-throughput burst (746 KB/s sustained)",
+          "threat_class": "EXFILTRATION"
+        }
+      ],
+      "correlated_threats": [
+        "RECON",
+        "EXFILTRATION",
+        "DDOS"
+      ],
+      "alert_id": "e52d8646-707b-4904-a722-1b5b2fee6937",
+      "prediction": "THREAT",
+      "score": 0.75,
+      "risk_breakdown": {
+        "base_confidence": 22.5,
+        "severity_component": 20.0,
+        "correlation_bonus": 15.0,
+        "persistence_bonus": 10.0,
+        "anomaly_component": 6.0,
+        "prediction_component": 5.9,
+        "historical_component": 5.0,
+        "threat_type_weight": 0.85,
+        "raw_sum": 84.5
+      },
+      "risk_methodology": "risk = (confidence(22.5) + severity(20.0) + correlation(15.0) + persistence(10.0) + anomaly(6.0) + prediction(5.9) + history(5.0)) \u00d7 weight(0.85) = 72/100",
+      "primary_threat": "RECON",
+      "time_window": "2026-09-15T18:44:44+00:00",
+      "detector_count": 2,
+      "threats": [
+        {
+          "detector": "RECON",
+          "prediction": "THREAT",
+          "score": 0.75,
+          "model_score": 0.75,
+          "threat_class": "RECON",
+          "severity": "HIGH",
+          "supporting_features": [
+            {
+              "feature": "unique_dst_ports",
+              "value": 75.0,
+              "contribution": 0.3,
+              "direction": "increases_risk",
+              "human_label": "High destination port diversity (75 unique ports)"
+            },
+            {
+              "feature": "unique_dst_ips",
+              "value": 120.0,
+              "contribution": 0.25,
+              "direction": "increases_risk",
+              "human_label": "High destination IP fan-out (120 unique hosts \u2014 horizontal scan)"
+            },
+            {
+              "feature": "flow_rate",
+              "value": 44.0,
+              "contribution": 0.2,
+              "direction": "increases_risk",
+              "human_label": "Elevated connection attempt rate (44.00 flows/sec)"
+            }
+          ],
+          "detector_type": "statistical_rule_based"
+        },
+        {
+          "detector": "EXFILTRATION",
+          "prediction": "THREAT",
+          "score": 0.5439,
+          "model_score": 0.5439,
+          "threat_class": "EXFILTRATION",
+          "severity": "MEDIUM",
+          "supporting_features": [
+            {
+              "feature": "bytes_out",
+              "value": 2239359,
+              "contribution": 0.194,
+              "direction": "increases_risk",
+              "human_label": "Large outbound transfer (2.2 MB)"
+            },
+            {
+              "feature": "outbound_ratio",
+              "value": 29.13,
+              "contribution": 0.25,
+              "direction": "increases_risk",
+              "human_label": "Asymmetric traffic: 29.1\u00d7 more outbound than inbound"
+            },
+            {
+              "feature": "bytes_per_sec",
+              "value": 746453.0,
+              "contribution": 0.1,
+              "direction": "increases_risk",
+              "human_label": "High-throughput burst (746 KB/s sustained)"
+            }
+          ],
+          "detector_type": "statistical_rule_based"
+        }
+      ],
+      "contributing_features": [
+        {
+          "feature": "unique_dst_ports",
+          "value": 75.0,
+          "contribution": 0.3,
+          "direction": "increases_risk",
+          "human_label": "High destination port diversity (75 unique ports)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "unique_dst_ips",
+          "value": 120.0,
+          "contribution": 0.25,
+          "direction": "increases_risk",
+          "human_label": "High destination IP fan-out (120 unique hosts \u2014 horizontal scan)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "flow_rate",
+          "value": 44.0,
+          "contribution": 0.2,
+          "direction": "increases_risk",
+          "human_label": "Elevated connection attempt rate (44.00 flows/sec)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "bytes_out",
+          "value": 2239359,
+          "contribution": 0.194,
+          "direction": "increases_risk",
+          "human_label": "Large outbound transfer (2.2 MB)",
+          "threat_class": "EXFILTRATION"
+        },
+        {
+          "feature": "outbound_ratio",
+          "value": 29.13,
+          "contribution": 0.25,
+          "direction": "increases_risk",
+          "human_label": "Asymmetric traffic: 29.1\u00d7 more outbound than inbound",
+          "threat_class": "EXFILTRATION"
+        },
+        {
+          "feature": "bytes_per_sec",
+          "value": 746453.0,
+          "contribution": 0.1,
+          "direction": "increases_risk",
+          "human_label": "High-throughput burst (746 KB/s sustained)",
+          "threat_class": "EXFILTRATION"
+        }
+      ],
+      "prediction_reasoning": "Active detectors: RECON, EXFILTRATION; Current state: EXFILTRATION; Transition matrix P(EXFILTRATION->EXFILTRATION)=0.60",
+      "state_history": [
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "RECON",
+            "EXFILTRATION"
+          ],
+          "timestamp": 1789497871.4330142
+        },
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "RECON",
+            "EXFILTRATION"
+          ],
+          "timestamp": 1789497874.8072479
+        },
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "DDoS",
+            "RECON"
+          ],
+          "timestamp": 1789497877.953672
+        },
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "RECON",
+            "EXFILTRATION"
+          ],
+          "timestamp": 1789497881.0824912
+        },
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "RECON",
+            "EXFILTRATION"
+          ],
+          "timestamp": 1789497884.181046
+        }
+      ],
+      "correlated": true,
+      "correlation_score": 0.8292,
+      "correlation_pattern": null,
+      "inference_latency_ms": 69.51
+    },
+    {
+      "id": "b8e8acb2-5605-437a-afe7-e91fe5d2361f",
+      "timestamp": 1789497880.9558842,
+      "flow_id": "flow_192.168.0.114_81.0.45.89_64334_54642_1789497877.9558842",
+      "source": "192.168.0.114",
+      "destination": "104.16.249.249",
+      "protocol": "TCP",
+      "threat_class": "RECON",
+      "confidence": 0.75,
+      "risk_score": 72,
+      "severity": "HIGH",
+      "current_state": "EXFILTRATION",
+      "predicted_next_state": "EXFILTRATION",
+      "prediction_confidence": 0.595,
+      "model_version": "v1.0",
+      "correlation_id": null,
+      "evidence": [
+        {
+          "feature": "unique_dst_ports",
+          "value": 114.0,
+          "contribution": 0.3,
+          "direction": "increases_risk",
+          "human_label": "High destination port diversity (114 unique ports)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "unique_dst_ips",
+          "value": 160.0,
+          "contribution": 0.25,
+          "direction": "increases_risk",
+          "human_label": "High destination IP fan-out (160 unique hosts \u2014 horizontal scan)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "flow_rate",
+          "value": 57.333,
+          "contribution": 0.2,
+          "direction": "increases_risk",
+          "human_label": "Elevated connection attempt rate (57.33 flows/sec)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "bytes_out",
+          "value": 2998329,
+          "contribution": 0.204,
+          "direction": "increases_risk",
+          "human_label": "Large outbound transfer (3.0 MB)",
+          "threat_class": "EXFILTRATION"
+        },
+        {
+          "feature": "outbound_ratio",
+          "value": 33.17,
+          "contribution": 0.25,
+          "direction": "increases_risk",
+          "human_label": "Asymmetric traffic: 33.2\u00d7 more outbound than inbound",
+          "threat_class": "EXFILTRATION"
+        },
+        {
+          "feature": "bytes_per_sec",
+          "value": 999443.0,
+          "contribution": 0.1,
+          "direction": "increases_risk",
+          "human_label": "High-throughput burst (999 KB/s sustained)",
+          "threat_class": "EXFILTRATION"
+        }
+      ],
+      "correlated_threats": [
+        "RECON",
+        "EXFILTRATION",
+        "DDOS"
+      ],
+      "alert_id": "b8e8acb2-5605-437a-afe7-e91fe5d2361f",
+      "prediction": "THREAT",
+      "score": 0.75,
+      "risk_breakdown": {
+        "base_confidence": 22.5,
+        "severity_component": 20.0,
+        "correlation_bonus": 15.0,
+        "persistence_bonus": 10.0,
+        "anomaly_component": 6.0,
+        "prediction_component": 5.9,
+        "historical_component": 5.0,
+        "threat_type_weight": 0.85,
+        "raw_sum": 84.5
+      },
+      "risk_methodology": "risk = (confidence(22.5) + severity(20.0) + correlation(15.0) + persistence(10.0) + anomaly(6.0) + prediction(5.9) + history(5.0)) \u00d7 weight(0.85) = 72/100",
+      "primary_threat": "RECON",
+      "time_window": "2026-09-15T18:44:40+00:00",
+      "detector_count": 2,
+      "threats": [
+        {
+          "detector": "RECON",
+          "prediction": "THREAT",
+          "score": 0.75,
+          "model_score": 0.75,
+          "threat_class": "RECON",
+          "severity": "HIGH",
+          "supporting_features": [
+            {
+              "feature": "unique_dst_ports",
+              "value": 114.0,
+              "contribution": 0.3,
+              "direction": "increases_risk",
+              "human_label": "High destination port diversity (114 unique ports)"
+            },
+            {
+              "feature": "unique_dst_ips",
+              "value": 160.0,
+              "contribution": 0.25,
+              "direction": "increases_risk",
+              "human_label": "High destination IP fan-out (160 unique hosts \u2014 horizontal scan)"
+            },
+            {
+              "feature": "flow_rate",
+              "value": 57.333,
+              "contribution": 0.2,
+              "direction": "increases_risk",
+              "human_label": "Elevated connection attempt rate (57.33 flows/sec)"
+            }
+          ],
+          "detector_type": "statistical_rule_based"
+        },
+        {
+          "detector": "EXFILTRATION",
+          "prediction": "THREAT",
+          "score": 0.5545,
+          "model_score": 0.5545,
+          "threat_class": "EXFILTRATION",
+          "severity": "MEDIUM",
+          "supporting_features": [
+            {
+              "feature": "bytes_out",
+              "value": 2998329,
+              "contribution": 0.204,
+              "direction": "increases_risk",
+              "human_label": "Large outbound transfer (3.0 MB)"
+            },
+            {
+              "feature": "outbound_ratio",
+              "value": 33.17,
+              "contribution": 0.25,
+              "direction": "increases_risk",
+              "human_label": "Asymmetric traffic: 33.2\u00d7 more outbound than inbound"
+            },
+            {
+              "feature": "bytes_per_sec",
+              "value": 999443.0,
+              "contribution": 0.1,
+              "direction": "increases_risk",
+              "human_label": "High-throughput burst (999 KB/s sustained)"
+            }
+          ],
+          "detector_type": "statistical_rule_based"
+        }
+      ],
+      "contributing_features": [
+        {
+          "feature": "unique_dst_ports",
+          "value": 114.0,
+          "contribution": 0.3,
+          "direction": "increases_risk",
+          "human_label": "High destination port diversity (114 unique ports)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "unique_dst_ips",
+          "value": 160.0,
+          "contribution": 0.25,
+          "direction": "increases_risk",
+          "human_label": "High destination IP fan-out (160 unique hosts \u2014 horizontal scan)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "flow_rate",
+          "value": 57.333,
+          "contribution": 0.2,
+          "direction": "increases_risk",
+          "human_label": "Elevated connection attempt rate (57.33 flows/sec)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "bytes_out",
+          "value": 2998329,
+          "contribution": 0.204,
+          "direction": "increases_risk",
+          "human_label": "Large outbound transfer (3.0 MB)",
+          "threat_class": "EXFILTRATION"
+        },
+        {
+          "feature": "outbound_ratio",
+          "value": 33.17,
+          "contribution": 0.25,
+          "direction": "increases_risk",
+          "human_label": "Asymmetric traffic: 33.2\u00d7 more outbound than inbound",
+          "threat_class": "EXFILTRATION"
+        },
+        {
+          "feature": "bytes_per_sec",
+          "value": 999443.0,
+          "contribution": 0.1,
+          "direction": "increases_risk",
+          "human_label": "High-throughput burst (999 KB/s sustained)",
+          "threat_class": "EXFILTRATION"
+        }
+      ],
+      "prediction_reasoning": "Active detectors: RECON, EXFILTRATION; Current state: EXFILTRATION; Transition matrix P(EXFILTRATION->EXFILTRATION)=0.60",
+      "state_history": [
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "DDoS",
+            "RECON"
+          ],
+          "timestamp": 1789497868.2836874
+        },
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "RECON",
+            "EXFILTRATION"
+          ],
+          "timestamp": 1789497871.4330142
+        },
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "RECON",
+            "EXFILTRATION"
+          ],
+          "timestamp": 1789497874.8072479
+        },
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "DDoS",
+            "RECON"
+          ],
+          "timestamp": 1789497877.953672
+        },
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "RECON",
+            "EXFILTRATION"
+          ],
+          "timestamp": 1789497881.0824912
+        }
+      ],
+      "correlated": true,
+      "correlation_score": 0.8293,
+      "correlation_pattern": null,
+      "inference_latency_ms": 80.4
+    },
+    {
+      "id": "570dd608-5895-4cf1-9820-5f76ffa78b14",
+      "timestamp": 1789497877.811633,
+      "flow_id": "flow_192.168.0.114_81.0.45.89_64334_54642_1789497874.811633",
+      "source": "192.168.0.114",
+      "destination": "104.16.249.249",
+      "protocol": "TCP",
+      "threat_class": "RECON",
+      "confidence": 0.75,
+      "risk_score": 71,
+      "severity": "HIGH",
+      "current_state": "EXFILTRATION",
+      "predicted_next_state": "EXFILTRATION",
+      "prediction_confidence": 0.495,
+      "model_version": "v1.0",
+      "correlation_id": null,
+      "evidence": [
+        {
+          "feature": "total_bytes",
+          "value": 9880800.0,
+          "feature_value": 9880800.0,
+          "contribution": 27.7421,
+          "importance": 27.7421,
+          "direction": "increases_risk",
+          "threat_class": "DDoS",
+          "human_label": "Total Transferred Byte Volume"
+        },
+        {
+          "feature": "total_packets",
+          "value": 5704.0,
+          "feature_value": 5704.0,
+          "contribution": 25.6446,
+          "importance": 25.6446,
+          "direction": "increases_risk",
+          "threat_class": "DDoS",
+          "human_label": "Total Packet Volume"
+        },
+        {
+          "feature": "total_packets_rolling3",
+          "value": 2722.0,
+          "feature_value": 2722.0,
+          "contribution": -13.1638,
+          "importance": 13.1638,
+          "direction": "decreases_risk",
+          "threat_class": "DDoS",
+          "human_label": "Total Packets Rolling3"
+        },
+        {
+          "feature": "mean_packet_size",
+          "value": 1732.2581,
+          "feature_value": 1732.2581,
+          "contribution": -11.6279,
+          "importance": 11.6279,
+          "direction": "decreases_risk",
+          "threat_class": "DDoS",
+          "human_label": "Mean Packet Size"
+        },
+        {
+          "feature": "mean_packet_size_lag1",
+          "value": 1267.8823,
+          "feature_value": 1267.8823,
+          "contribution": -6.6442,
+          "importance": 6.6442,
+          "direction": "decreases_risk",
+          "threat_class": "DDoS",
+          "human_label": "Mean Packet Size Lag1"
+        },
+        {
+          "feature": "unique_dst_ports",
+          "value": 128.0,
+          "contribution": 0.3,
+          "direction": "increases_risk",
+          "human_label": "High destination port diversity (128 unique ports)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "unique_dst_ips",
+          "value": 172.0,
+          "contribution": 0.25,
+          "direction": "increases_risk",
+          "human_label": "High destination IP fan-out (172 unique hosts \u2014 horizontal scan)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "flow_rate",
+          "value": 61.333,
+          "contribution": 0.2,
+          "direction": "increases_risk",
+          "human_label": "Elevated connection attempt rate (61.33 flows/sec)",
+          "threat_class": "RECON"
+        }
+      ],
+      "correlated_threats": [
+        "RECON",
+        "EXFILTRATION",
+        "DDOS"
+      ],
+      "alert_id": "570dd608-5895-4cf1-9820-5f76ffa78b14",
+      "prediction": "THREAT",
+      "score": 0.75,
+      "risk_breakdown": {
+        "base_confidence": 22.5,
+        "severity_component": 20.0,
+        "correlation_bonus": 15.0,
+        "persistence_bonus": 10.0,
+        "anomaly_component": 6.0,
+        "prediction_component": 5.0,
+        "historical_component": 5.0,
+        "threat_type_weight": 0.85,
+        "raw_sum": 83.5
+      },
+      "risk_methodology": "risk = (confidence(22.5) + severity(20.0) + correlation(15.0) + persistence(10.0) + anomaly(6.0) + prediction(5.0) + history(5.0)) \u00d7 weight(0.85) = 71/100",
+      "primary_threat": "RECON",
+      "time_window": "2026-09-15T18:44:37+00:00",
+      "detector_count": 2,
+      "threats": [
+        {
+          "detector": "DDoS",
+          "prediction": "THREAT",
+          "score": 0.9996946134762352,
+          "model_score": 0.9996946134762352,
+          "threat_class": "DDoS",
+          "severity": "LOW",
+          "supporting_features": [
+            {
+              "feature": "total_bytes",
+              "value": 9880800.0,
+              "feature_value": 9880800.0,
+              "contribution": 27.7421,
+              "importance": 27.7421,
+              "direction": "increases_risk"
+            },
+            {
+              "feature": "total_packets",
+              "value": 5704.0,
+              "feature_value": 5704.0,
+              "contribution": 25.6446,
+              "importance": 25.6446,
+              "direction": "increases_risk"
+            },
+            {
+              "feature": "total_packets_rolling3",
+              "value": 2722.0,
+              "feature_value": 2722.0,
+              "contribution": -13.1638,
+              "importance": 13.1638,
+              "direction": "decreases_risk"
+            },
+            {
+              "feature": "mean_packet_size",
+              "value": 1732.2581,
+              "feature_value": 1732.2581,
+              "contribution": -11.6279,
+              "importance": 11.6279,
+              "direction": "decreases_risk"
+            },
+            {
+              "feature": "mean_packet_size_lag1",
+              "value": 1267.8823,
+              "feature_value": 1267.8823,
+              "contribution": -6.6442,
+              "importance": 6.6442,
+              "direction": "decreases_risk"
+            }
+          ],
+          "detector_type": "ml"
+        },
+        {
+          "detector": "RECON",
+          "prediction": "THREAT",
+          "score": 0.75,
+          "model_score": 0.75,
+          "threat_class": "RECON",
+          "severity": "HIGH",
+          "supporting_features": [
+            {
+              "feature": "unique_dst_ports",
+              "value": 128.0,
+              "contribution": 0.3,
+              "direction": "increases_risk",
+              "human_label": "High destination port diversity (128 unique ports)"
+            },
+            {
+              "feature": "unique_dst_ips",
+              "value": 172.0,
+              "contribution": 0.25,
+              "direction": "increases_risk",
+              "human_label": "High destination IP fan-out (172 unique hosts \u2014 horizontal scan)"
+            },
+            {
+              "feature": "flow_rate",
+              "value": 61.333,
+              "contribution": 0.2,
+              "direction": "increases_risk",
+              "human_label": "Elevated connection attempt rate (61.33 flows/sec)"
+            }
+          ],
+          "detector_type": "statistical_rule_based"
+        }
+      ],
+      "contributing_features": [
+        {
+          "feature": "total_bytes",
+          "value": 9880800.0,
+          "feature_value": 9880800.0,
+          "contribution": 27.7421,
+          "importance": 27.7421,
+          "direction": "increases_risk",
+          "threat_class": "DDoS",
+          "human_label": "Total Transferred Byte Volume"
+        },
+        {
+          "feature": "total_packets",
+          "value": 5704.0,
+          "feature_value": 5704.0,
+          "contribution": 25.6446,
+          "importance": 25.6446,
+          "direction": "increases_risk",
+          "threat_class": "DDoS",
+          "human_label": "Total Packet Volume"
+        },
+        {
+          "feature": "total_packets_rolling3",
+          "value": 2722.0,
+          "feature_value": 2722.0,
+          "contribution": -13.1638,
+          "importance": 13.1638,
+          "direction": "decreases_risk",
+          "threat_class": "DDoS",
+          "human_label": "Total Packets Rolling3"
+        },
+        {
+          "feature": "mean_packet_size",
+          "value": 1732.2581,
+          "feature_value": 1732.2581,
+          "contribution": -11.6279,
+          "importance": 11.6279,
+          "direction": "decreases_risk",
+          "threat_class": "DDoS",
+          "human_label": "Mean Packet Size"
+        },
+        {
+          "feature": "mean_packet_size_lag1",
+          "value": 1267.8823,
+          "feature_value": 1267.8823,
+          "contribution": -6.6442,
+          "importance": 6.6442,
+          "direction": "decreases_risk",
+          "threat_class": "DDoS",
+          "human_label": "Mean Packet Size Lag1"
+        },
+        {
+          "feature": "unique_dst_ports",
+          "value": 128.0,
+          "contribution": 0.3,
+          "direction": "increases_risk",
+          "human_label": "High destination port diversity (128 unique ports)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "unique_dst_ips",
+          "value": 172.0,
+          "contribution": 0.25,
+          "direction": "increases_risk",
+          "human_label": "High destination IP fan-out (172 unique hosts \u2014 horizontal scan)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "flow_rate",
+          "value": 61.333,
+          "contribution": 0.2,
+          "direction": "increases_risk",
+          "human_label": "Elevated connection attempt rate (61.33 flows/sec)",
+          "threat_class": "RECON"
+        }
+      ],
+      "prediction_reasoning": "Active detectors: DDoS, RECON; Current state: EXFILTRATION; Transition matrix P(EXFILTRATION->EXFILTRATION)=0.50",
+      "state_history": [
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "DDoS",
+            "RECON"
+          ],
+          "timestamp": 1789497865.167791
+        },
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "DDoS",
+            "RECON"
+          ],
+          "timestamp": 1789497868.2836874
+        },
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "RECON",
+            "EXFILTRATION"
+          ],
+          "timestamp": 1789497871.4330142
+        },
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "RECON",
+            "EXFILTRATION"
+          ],
+          "timestamp": 1789497874.8072479
+        },
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "DDoS",
+            "RECON"
+          ],
+          "timestamp": 1789497877.953672
+        }
+      ],
+      "correlated": true,
+      "correlation_score": 0.8303,
+      "correlation_pattern": null,
+      "inference_latency_ms": 87.3
+    },
+    {
+      "id": "f98beefb-64b6-4545-825b-b01902d804b5",
+      "timestamp": 1789497874.4457865,
+      "flow_id": "flow_192.168.0.114_81.0.45.89_64334_54642_1789497871.4457865",
+      "source": "192.168.0.114",
+      "destination": "104.16.249.249",
+      "protocol": "TCP",
+      "threat_class": "RECON",
+      "confidence": 0.75,
+      "risk_score": 72,
+      "severity": "HIGH",
+      "current_state": "EXFILTRATION",
+      "predicted_next_state": "EXFILTRATION",
+      "prediction_confidence": 0.595,
+      "model_version": "v1.0",
+      "correlation_id": null,
+      "evidence": [
+        {
+          "feature": "unique_dst_ports",
+          "value": 130.0,
+          "contribution": 0.3,
+          "direction": "increases_risk",
+          "human_label": "High destination port diversity (130 unique ports)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "unique_dst_ips",
+          "value": 174.0,
+          "contribution": 0.25,
+          "direction": "increases_risk",
+          "human_label": "High destination IP fan-out (174 unique hosts \u2014 horizontal scan)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "flow_rate",
+          "value": 62.0,
+          "contribution": 0.2,
+          "direction": "increases_risk",
+          "human_label": "Elevated connection attempt rate (62.00 flows/sec)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "bytes_out",
+          "value": 3746096,
+          "contribution": 0.213,
+          "direction": "increases_risk",
+          "human_label": "Large outbound transfer (3.7 MB)",
+          "threat_class": "EXFILTRATION"
+        },
+        {
+          "feature": "outbound_ratio",
+          "value": 14.25,
+          "contribution": 0.241,
+          "direction": "increases_risk",
+          "human_label": "Asymmetric traffic: 14.2\u00d7 more outbound than inbound",
+          "threat_class": "EXFILTRATION"
+        },
+        {
+          "feature": "bytes_per_sec",
+          "value": 1248698.7,
+          "contribution": 0.1,
+          "direction": "increases_risk",
+          "human_label": "High-throughput burst (1249 KB/s sustained)",
+          "threat_class": "EXFILTRATION"
+        }
+      ],
+      "correlated_threats": [
+        "RECON",
+        "EXFILTRATION",
+        "DDOS"
+      ],
+      "alert_id": "f98beefb-64b6-4545-825b-b01902d804b5",
+      "prediction": "THREAT",
+      "score": 0.75,
+      "risk_breakdown": {
+        "base_confidence": 22.5,
+        "severity_component": 20.0,
+        "correlation_bonus": 15.0,
+        "persistence_bonus": 10.0,
+        "anomaly_component": 6.0,
+        "prediction_component": 5.9,
+        "historical_component": 5.0,
+        "threat_type_weight": 0.85,
+        "raw_sum": 84.5
+      },
+      "risk_methodology": "risk = (confidence(22.5) + severity(20.0) + correlation(15.0) + persistence(10.0) + anomaly(6.0) + prediction(5.9) + history(5.0)) \u00d7 weight(0.85) = 72/100",
+      "primary_threat": "RECON",
+      "time_window": "2026-09-15T18:44:34+00:00",
+      "detector_count": 2,
+      "threats": [
+        {
+          "detector": "RECON",
+          "prediction": "THREAT",
+          "score": 0.75,
+          "model_score": 0.75,
+          "threat_class": "RECON",
+          "severity": "HIGH",
+          "supporting_features": [
+            {
+              "feature": "unique_dst_ports",
+              "value": 130.0,
+              "contribution": 0.3,
+              "direction": "increases_risk",
+              "human_label": "High destination port diversity (130 unique ports)"
+            },
+            {
+              "feature": "unique_dst_ips",
+              "value": 174.0,
+              "contribution": 0.25,
+              "direction": "increases_risk",
+              "human_label": "High destination IP fan-out (174 unique hosts \u2014 horizontal scan)"
+            },
+            {
+              "feature": "flow_rate",
+              "value": 62.0,
+              "contribution": 0.2,
+              "direction": "increases_risk",
+              "human_label": "Elevated connection attempt rate (62.00 flows/sec)"
+            }
+          ],
+          "detector_type": "statistical_rule_based"
+        },
+        {
+          "detector": "EXFILTRATION",
+          "prediction": "THREAT",
+          "score": 0.5535,
+          "model_score": 0.5535,
+          "threat_class": "EXFILTRATION",
+          "severity": "MEDIUM",
+          "supporting_features": [
+            {
+              "feature": "bytes_out",
+              "value": 3746096,
+              "contribution": 0.213,
+              "direction": "increases_risk",
+              "human_label": "Large outbound transfer (3.7 MB)"
+            },
+            {
+              "feature": "outbound_ratio",
+              "value": 14.25,
+              "contribution": 0.241,
+              "direction": "increases_risk",
+              "human_label": "Asymmetric traffic: 14.2\u00d7 more outbound than inbound"
+            },
+            {
+              "feature": "bytes_per_sec",
+              "value": 1248698.7,
+              "contribution": 0.1,
+              "direction": "increases_risk",
+              "human_label": "High-throughput burst (1249 KB/s sustained)"
+            }
+          ],
+          "detector_type": "statistical_rule_based"
+        }
+      ],
+      "contributing_features": [
+        {
+          "feature": "unique_dst_ports",
+          "value": 130.0,
+          "contribution": 0.3,
+          "direction": "increases_risk",
+          "human_label": "High destination port diversity (130 unique ports)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "unique_dst_ips",
+          "value": 174.0,
+          "contribution": 0.25,
+          "direction": "increases_risk",
+          "human_label": "High destination IP fan-out (174 unique hosts \u2014 horizontal scan)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "flow_rate",
+          "value": 62.0,
+          "contribution": 0.2,
+          "direction": "increases_risk",
+          "human_label": "Elevated connection attempt rate (62.00 flows/sec)",
+          "threat_class": "RECON"
+        },
+        {
+          "feature": "bytes_out",
+          "value": 3746096,
+          "contribution": 0.213,
+          "direction": "increases_risk",
+          "human_label": "Large outbound transfer (3.7 MB)",
+          "threat_class": "EXFILTRATION"
+        },
+        {
+          "feature": "outbound_ratio",
+          "value": 14.25,
+          "contribution": 0.241,
+          "direction": "increases_risk",
+          "human_label": "Asymmetric traffic: 14.2\u00d7 more outbound than inbound",
+          "threat_class": "EXFILTRATION"
+        },
+        {
+          "feature": "bytes_per_sec",
+          "value": 1248698.7,
+          "contribution": 0.1,
+          "direction": "increases_risk",
+          "human_label": "High-throughput burst (1249 KB/s sustained)",
+          "threat_class": "EXFILTRATION"
+        }
+      ],
+      "prediction_reasoning": "Active detectors: RECON, EXFILTRATION; Current state: EXFILTRATION; Transition matrix P(EXFILTRATION->EXFILTRATION)=0.60",
+      "state_history": [
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "RECON",
+            "EXFILTRATION"
+          ],
+          "timestamp": 1789497862.0695648
+        },
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "DDoS",
+            "RECON"
+          ],
+          "timestamp": 1789497865.167791
+        },
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "DDoS",
+            "RECON"
+          ],
+          "timestamp": 1789497868.2836874
+        },
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "RECON",
+            "EXFILTRATION"
+          ],
+          "timestamp": 1789497871.4330142
+        },
+        {
+          "from": "EXFILTRATION",
+          "to": "EXFILTRATION",
+          "threats": [
+            "RECON",
+            "EXFILTRATION"
+          ],
+          "timestamp": 1789497874.8072479
+        }
+      ],
+      "correlated": true,
+      "correlation_score": 0.828,
+      "correlation_pattern": null,
+      "inference_latency_ms": 314.5
+    }
+  ]
 }

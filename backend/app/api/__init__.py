@@ -11,6 +11,7 @@ from backend.app.api.network import router as network_router
 from backend.app.api.trajectory import router as trajectory_router
 from backend.app.api.models import router as models_router
 from backend.app.api.replay import router as replay_router
+from backend.app.api.scanner import router as scanner_router
 from backend.app.api.websocket import router as websocket_router, ws_manager
 
 __all__ = [
@@ -22,6 +23,7 @@ __all__ = [
     "trajectory_router",
     "models_router",
     "replay_router",
+    "scanner_router",
     "websocket_router",
     "ws_manager",
 ]
